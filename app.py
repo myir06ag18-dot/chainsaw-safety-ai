@@ -7,7 +7,6 @@ from ultralytics import YOLO
 
 st.title("農林安全作業 フォーム診断AI")
 
-# AIモデルをキャッシュして毎回読み込み直すのを防ぐ（高速化①）
 @st.cache_resource
 def load_model():
     return YOLO("yolo11n-pose.pt")
@@ -55,17 +54,17 @@ else:
 
 if video_path is not None:
     if st.button("AI解析を開始"):
-        st.info("高速モードで解析を実行中...")
         model = load_model()
         cap = cv2.VideoCapture(video_path)
         
-        # 進捗バーと映像表示枠
+        # ① 解析中の進捗パーセント表示エリア
+        progress_text = st.empty()
         progress_bar = st.progress(0)
         st_frame = st.empty()
 
         total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
         frame_count = 0
-        skip_frames = 5  # 5コマに1回だけ解析して5倍速にする（高速化②）
+        skip_frames = 5  # 5コマに1回解析して高速化
 
         safe_frames = 0
         danger_frames = 0
@@ -79,7 +78,12 @@ if video_path is not None:
             if frame_count % skip_frames != 0:
                 continue
 
-            # 画像サイズを小さくしてAI処理を軽くする（高速化③）
+            # 進捗パーセントの計算と表示
+            if total_frames > 0:
+                percent = min(int((frame_count / total_frames) * 100), 100)
+                progress_bar.progress(percent)
+                progress_text.markdown(f"**⏳ AI解析中... {percent}% 完了**")
+
             h, w = frame.shape[:2]
             if w > 640:
                 scale = 640 / w
@@ -119,14 +123,12 @@ if video_path is not None:
             
             annotated_frame = cv2.cvtColor(annotated_frame, cv2.COLOR_BGR2RGB)
             st_frame.image(annotated_frame, channels="RGB")
-
-            if total_frames > 0:
-                progress_bar.progress(min(frame_count / total_frames, 1.0))
             
         cap.release()
-        progress_bar.progress(1.0)
-        st.success("解析が完了しました！")
+        progress_bar.progress(100)
+        progress_text.markdown("**✅ AI解析 100% 完了！**")
 
+        # ② 解析終了後の「何％安全か」レポート表示
         total_detected = safe_frames + danger_frames
         if total_detected > 0:
             safe_rate = (safe_frames / total_detected) * 100
