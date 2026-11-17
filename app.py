@@ -1,6 +1,8 @@
 import streamlit as st
 import cv2
 import numpy as np
+import pandas as pd
+from datetime import datetime, timezone, timedelta
 import tempfile
 import os
 import yt_dlp
@@ -12,8 +14,11 @@ st.set_page_config(
     layout="wide"
 )
 
+# 最新の1件と、複数回分の「履歴リスト」を保持する記憶領域
 if "analysis_result" not in st.session_state:
     st.session_state.analysis_result = None
+if "history" not in st.session_state:
+    st.session_state.history = []
 
 st.markdown("""
 <style>
@@ -59,27 +64,22 @@ st.markdown("""
 def load_model():
     return YOLO("yolo11n-pose.pt")
 
-# 座標計算のみで高速に「道具を構えているか」を判定する関数
 def is_holding_tool_fast(kpts):
     l_shoulder, r_shoulder = kpts[5], kpts[6]
     l_wrist, r_wrist = kpts[9], kpts[10]
     l_hip, r_hip = kpts[11], kpts[12]
 
-    # 両手首が見えていない場合は非保持
     if l_wrist[0] <= 0 or r_wrist[0] <= 0:
         return False
 
-    # 肩幅を基準にする
     shoulder_width = abs(l_shoulder[0] - r_shoulder[0])
     if shoulder_width < 10:
         return False
 
-    # 両手首の距離チェック（両手でハンドルを握っている構えか）
     wrist_dist = np.hypot(l_wrist[0] - r_wrist[0], l_wrist[1] - r_wrist[1])
     if wrist_dist < shoulder_width * 0.25 or wrist_dist > shoulder_width * 3.0:
         return False
 
-    # 腕を下にダランと垂らしている歩行状態を除外
     hip_y = max(l_hip[1], r_hip[1])
     if hip_y > 0 and (l_wrist[1] > hip_y + shoulder_width * 0.5 and r_wrist[1] > hip_y + shoulder_width * 0.5):
         return False
@@ -96,9 +96,10 @@ with st.sidebar:
     st.success("**⚡ 高速保持フィルタ搭載**\n\n骨格座標の構え方から作業中のみを瞬時に抽出し、非作業シーンを除外します。")
     st.divider()
     
-    if st.session_state.analysis_result is not None:
-        if st.button("🗑️ 診断結果をクリア"):
+    if st.session_state.analysis_result is not None or len(st.session_state.history) > 0:
+        if st.button("🗑️ 表示と履歴をすべてクリア"):
             st.session_state.analysis_result = None
+            st.session_state.history = []
             st.rerun()
 
 st.markdown("""
@@ -111,6 +112,7 @@ st.markdown("""
 col_left, col_right = st.columns([1, 1.3], gap="large")
 
 video_path = None
+video_name = "未指定"
 
 with col_left:
     st.markdown('<div class="ui-card">', unsafe_allow_html=True)
@@ -132,6 +134,7 @@ with col_left:
             tfile = tempfile.NamedTemporaryFile(delete=False, suffix=".mp4")
             tfile.write(uploaded_file.read())
             video_path = tfile.name
+            video_name = uploaded_file.name
             st.success("✅ 動画のセットが完了しました")
 
     with tab2:
@@ -158,6 +161,7 @@ with col_left:
                     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                         ydl.download([clean_url])
                     video_path = output_path
+                    video_name = clean_url
                     st.success("✅ YouTube動画の読み込み完了")
                 except Exception as e:
                     st.error("YouTube側の制限により直接読み込めませんでした。「動画ファイルをアップロード」タブをご利用ください。")
@@ -183,7 +187,7 @@ with col_right:
 
         total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
         frame_count = 0
-        skip_frames = 8  # 間引き幅を8にしてさらに高速化
+        skip_frames = 8
 
         safe_frames = 0
         danger_frames = 0
@@ -205,7 +209,7 @@ with col_right:
                 progress_text.markdown(f"**⏳ AI骨格解析を実行中... {percent}% 完了**")
 
             h, w = frame.shape[:2]
-            if w > 480:  # 解像度を480pxにしてAI推論を高速化
+            if w > 480:
                 scale = 480 / w
                 frame = cv2.resize(frame, (480, int(h * scale)))
 
@@ -253,6 +257,9 @@ with col_right:
         progress_bar.progress(100)
         progress_text.markdown("**✅ AI解析 100% 完了！**")
 
+        jst = timezone(timedelta(hours=9))
+        now_str = datetime.now(jst).strftime("%Y-%m-%d %H:%M:%S")
+
         total_detected = safe_frames + danger_frames
         if total_detected > 0:
             safe_rate = (safe_frames / total_detected) * 100
@@ -266,8 +273,27 @@ with col_right:
                 "standby_frames": standby_frames,
                 "last_frame": last_annotated_frame
             }
+            # 履歴リストに追加
+            st.session_state.history.insert(0, {
+                "診断日時": now_str,
+                "動画名": video_name,
+                "作業ツール": tool_type,
+                "安全フォーム率 (%)": round(safe_rate, 1),
+                "危険フォーム率 (%)": round(danger_rate, 1),
+                "作業コマ数": total_detected,
+                "非作業コマ数": standby_frames
+            })
         else:
             st.session_state.analysis_result = "no_tool_or_person"
+            st.session_state.history.insert(0, {
+                "診断日時": now_str,
+                "動画名": video_name,
+                "作業ツール": tool_type,
+                "安全フォーム率 (%)": 0.0,
+                "危険フォーム率 (%)": 0.0,
+                "作業コマ数": 0,
+                "非作業コマ数": standby_frames
+            })
 
     res = st.session_state.analysis_result
     if res == "no_tool_or_person":
@@ -300,4 +326,21 @@ with col_right:
             <p>左側のパネルから作業ツールと動画を選択し、<br>「AIフォーム診断を開始する」ボタンを押してください。</p>
         </div>
         """, unsafe_allow_html=True)
+    st.markdown("</div>", unsafe_allow_html=True)
+
+# 画面下部に「過去の診断履歴一覧」を常時表示
+if len(st.session_state.history) > 0:
+    st.markdown('<div class="ui-card">', unsafe_allow_html=True)
+    st.subheader("📋 診断履歴一覧（新しい順）")
+    df_history = pd.DataFrame(st.session_state.history)
+    st.dataframe(df_history, use_container_width=True, hide_index=True)
+
+    # CSVファイルとして保存できるダウンロードボタン
+    csv_data = df_history.to_csv(index=False).encode("utf-8-sig")
+    st.download_button(
+        label="📥 診断履歴をCSVでダウンロード",
+        data=csv_data,
+        file_name="forest_safety_history.csv",
+        mime="text/csv"
+    )
     st.markdown("</div>", unsafe_allow_html=True)
