@@ -14,11 +14,30 @@ st.set_page_config(
     layout="wide"
 )
 
-# 最新の1件と、複数回分の「履歴リスト」を保持する記憶領域
+# サーバー側に永続保存する履歴ファイル名
+HISTORY_FILE = "diagnosis_history.csv"
+
+# 履歴をCSVファイルから読み込む関数（ブラウザ更新後も消えない）
+def load_history():
+    if os.path.exists(HISTORY_FILE):
+        try:
+            return pd.read_csv(HISTORY_FILE).to_dict(orient="records")
+        except Exception:
+            return []
+    return []
+
+# 履歴をCSVファイルに保存する関数
+def save_history(history_list):
+    df = pd.DataFrame(history_list)
+    df.to_csv(HISTORY_FILE, index=False, encoding="utf-8-sig")
+
 if "analysis_result" not in st.session_state:
     st.session_state.analysis_result = None
 if "history" not in st.session_state:
-    st.session_state.history = []
+    st.session_state.history = load_history()
+else:
+    # ページ再読み込み時も常に最新のCSVから同期する
+    st.session_state.history = load_history()
 
 st.markdown("""
 <style>
@@ -97,9 +116,11 @@ with st.sidebar:
     st.divider()
     
     if st.session_state.analysis_result is not None or len(st.session_state.history) > 0:
-        if st.button("🗑️ 表示と履歴をすべてクリア"):
+        if st.button("🗑️ 保存された履歴をすべて削除"):
             st.session_state.analysis_result = None
             st.session_state.history = []
+            if os.path.exists(HISTORY_FILE):
+                os.remove(HISTORY_FILE)
             st.rerun()
 
 st.markdown("""
@@ -273,8 +294,7 @@ with col_right:
                 "standby_frames": standby_frames,
                 "last_frame": last_annotated_frame
             }
-            # 履歴リストに追加
-            st.session_state.history.insert(0, {
+            new_record = {
                 "診断日時": now_str,
                 "動画名": video_name,
                 "作業ツール": tool_type,
@@ -282,10 +302,10 @@ with col_right:
                 "危険フォーム率 (%)": round(danger_rate, 1),
                 "作業コマ数": total_detected,
                 "非作業コマ数": standby_frames
-            })
+            }
         else:
             st.session_state.analysis_result = "no_tool_or_person"
-            st.session_state.history.insert(0, {
+            new_record = {
                 "診断日時": now_str,
                 "動画名": video_name,
                 "作業ツール": tool_type,
@@ -293,7 +313,11 @@ with col_right:
                 "危険フォーム率 (%)": 0.0,
                 "作業コマ数": 0,
                 "非作業コマ数": standby_frames
-            })
+            }
+
+        # 履歴リストの先頭に追加し、ファイル（CSV）に永続保存
+        st.session_state.history.insert(0, new_record)
+        save_history(st.session_state.history)
 
     res = st.session_state.analysis_result
     if res == "no_tool_or_person":
@@ -328,14 +352,13 @@ with col_right:
         """, unsafe_allow_html=True)
     st.markdown("</div>", unsafe_allow_html=True)
 
-# 画面下部に「過去の診断履歴一覧」を常時表示
+# 画面下部に「過去の診断履歴一覧」を常時表示（更新しても消えない）
 if len(st.session_state.history) > 0:
     st.markdown('<div class="ui-card">', unsafe_allow_html=True)
-    st.subheader("📋 診断履歴一覧（新しい順）")
+    st.subheader("📋 診断履歴一覧（新しい順・自動保存）")
     df_history = pd.DataFrame(st.session_state.history)
     st.dataframe(df_history, use_container_width=True, hide_index=True)
 
-    # CSVファイルとして保存できるダウンロードボタン
     csv_data = df_history.to_csv(index=False).encode("utf-8-sig")
     st.download_button(
         label="📥 診断履歴をCSVでダウンロード",
