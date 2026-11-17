@@ -26,6 +26,8 @@ if input_method == "動画ファイルをアップロード":
 else:
     youtube_url = st.text_input("YouTubeのURLを貼り付けてください（例: https://www.youtube.com/watch?v=...）")
     if youtube_url:
+        # 共有リンクの余計なパラメータ(?si=...)を整理
+        clean_url = youtube_url.split("?si=")[0]
         st.info("YouTube動画を準備しています...")
         try:
             temp_dir = tempfile.mkdtemp()
@@ -33,14 +35,21 @@ else:
             ydl_opts = {
                 'format': 'best[ext=mp4]/best',
                 'outtmpl': output_path,
-                'quiet': True
+                'quiet': True,
+                'noplaylist': True,
+                'extractor_args': {
+                    'youtube': {
+                        'player_client': ['android', 'web']
+                    }
+                }
             }
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                ydl.download([youtube_url])
+                ydl.download([clean_url])
             video_path = output_path
             st.success("動画の読み込みが完了しました！")
         except Exception as e:
-            st.error("動画の読み込みに失敗しました。URLが正しいか、公開動画であるか確認してください。")
+            st.error("動画の読み込みに失敗しました。")
+            st.caption(f"詳細エラー: {e}")
 
 # 3. AI解析の実行
 if video_path is not None:
