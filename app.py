@@ -59,59 +59,32 @@ st.markdown("""
 def load_model():
     return YOLO("yolo11n-pose.pt")
 
-# 手首周辺にチェンソー・刈払機を保持しているか判定する関数
-def is_holding_tool(frame, kpts, tool_type):
+# 座標計算のみで高速に「道具を構えているか」を判定する関数
+def is_holding_tool_fast(kpts):
     l_shoulder, r_shoulder = kpts[5], kpts[6]
-    l_elbow, r_elbow = kpts[7], kpts[8]
     l_wrist, r_wrist = kpts[9], kpts[10]
     l_hip, r_hip = kpts[11], kpts[12]
 
-    # 両手首が検出されていない場合は非保持とみなす
+    # 両手首が見えていない場合は非保持
     if l_wrist[0] <= 0 or r_wrist[0] <= 0:
         return False
 
-    # 肩幅を基準スケールとして計算
-    shoulder_width = np.linalg.norm(l_shoulder - r_shoulder)
-    if shoulder_width < 15:
+    # 肩幅を基準にする
+    shoulder_width = abs(l_shoulder[0] - r_shoulder[0])
+    if shoulder_width < 10:
         return False
 
-    # 両手首の距離チェック（チェンソー・刈払機は両手でハンドルを握るため一定幅を保つ）
-    wrist_dist = np.linalg.norm(l_wrist - r_wrist)
-    if wrist_dist < shoulder_width * 0.3 or wrist_dist > shoulder_width * 3.0:
+    # 両手首の距離チェック（両手でハンドルを握っている構えか）
+    wrist_dist = np.hypot(l_wrist[0] - r_wrist[0], l_wrist[1] - r_wrist[1])
+    if wrist_dist < shoulder_width * 0.25 or wrist_dist > shoulder_width * 3.0:
         return False
 
-    # 歩行中の垂れ下がり除外（少なくとも片方の肘が曲がって手首が腰より極端に下にないこと）
+    # 腕を下にダランと垂らしている歩行状態を除外
     hip_y = max(l_hip[1], r_hip[1])
-    if hip_y > 0 and (l_wrist[1] > hip_y + shoulder_width * 0.6 and r_wrist[1] > hip_y + shoulder_width * 0.6):
+    if hip_y > 0 and (l_wrist[1] > hip_y + shoulder_width * 0.5 and r_wrist[1] > hip_y + shoulder_width * 0.5):
         return False
 
-    # 手首周辺領域（ROI）の抽出と視覚特徴（機械色・金属エッジ）チェック
-    h, w = frame.shape[:2]
-    cx = int((l_wrist[0] + r_wrist[0]) / 2)
-    cy = int((l_wrist[1] + r_wrist[1]) / 2)
-    margin = int(shoulder_width * 1.2)
-
-    x1, y1 = max(0, cx - margin), max(0, cy - margin)
-    x2, y2 = min(w, cx + margin), min(h, cy + margin)
-    roi = frame[y1:y2, x1:x2]
-
-    if roi.size == 0:
-        return False
-
-    # 機械ボディ色（オレンジ・赤・黄・青など高彩度色）または金属シャフト（強いエッジ）の検出
-    hsv = cv2.cvtColor(roi, cv2.COLOR_BGR2HSV)
-    # 彩度が高いピクセル（オレンジ・赤・青などの農林機械カラー）
-    high_sat_ratio = np.mean(hsv[:, :, 1] > 90)
-    # エッジ検出（バーやシャフトの直線輪郭）
-    gray = cv2.cvtColor(roi, cv2.COLOR_BGR2GRAY)
-    edges = cv2.Canny(gray, 80, 180)
-    edge_ratio = np.mean(edges > 0)
-
-    # 機械カラーまたは金属エッジが一定以上あれば「道具保持中」と判定
-    if high_sat_ratio > 0.04 or edge_ratio > 0.06:
-        return True
-
-    return False
+    return True
 
 with st.sidebar:
     st.markdown("## 🌲 ForestSafe AI")
@@ -120,7 +93,7 @@ with st.sidebar:
     st.markdown("### 📋 安全判定の基準")
     st.info("**🪚 チェンソーモード**\n\nチェンソー保持中、手首が肩より高い位置に上がると「危険」と判定します。")
     st.warning("**🌿 刈払機モード**\n\n刈払機保持中、右手首が腰より大きく右側へ振り抜かれると「危険」と判定します。")
-    st.success("**🔍 道具保持フィルタ搭載**\n\n道具を持たずに歩いているだけの場面は自動で除外し、作業中のみを診断します。")
+    st.success("**⚡ 高速保持フィルタ搭載**\n\n骨格座標の構え方から作業中のみを瞬時に抽出し、非作業シーンを除外します。")
     st.divider()
     
     if st.session_state.analysis_result is not None:
@@ -210,7 +183,7 @@ with col_right:
 
         total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
         frame_count = 0
-        skip_frames = 5
+        skip_frames = 8  # 間引き幅を8にしてさらに高速化
 
         safe_frames = 0
         danger_frames = 0
@@ -232,9 +205,9 @@ with col_right:
                 progress_text.markdown(f"**⏳ AI骨格解析を実行中... {percent}% 完了**")
 
             h, w = frame.shape[:2]
-            if w > 640:
-                scale = 640 / w
-                frame = cv2.resize(frame, (640, int(h * scale)))
+            if w > 480:  # 解像度を480pxにしてAI推論を高速化
+                scale = 480 / w
+                frame = cv2.resize(frame, (480, int(h * scale)))
 
             results = model(frame, verbose=False)
             annotated_frame = results[0].plot()
@@ -242,8 +215,7 @@ with col_right:
             if results[0].keypoints is not None and len(results[0].keypoints.xy) > 0:
                 kpts = results[0].keypoints.xy[0].cpu().numpy()
                 if len(kpts) >= 13:
-                    # 道具（チェンソー・刈払機）を持っているか判定
-                    if is_holding_tool(frame, kpts, tool_type):
+                    if is_holding_tool_fast(kpts):
                         l_shoulder, r_shoulder = kpts[5], kpts[6]
                         l_wrist, r_wrist = kpts[9], kpts[10]
                         l_hip, r_hip = kpts[11], kpts[12]
@@ -254,7 +226,7 @@ with col_right:
                                (r_wrist[1] > 0 and r_shoulder[1] > 0 and r_wrist[1] < r_shoulder[1]):
                                 is_danger = True
                         else:
-                            if r_wrist[0] > 0 and r_hip[0] > 0 and r_wrist[0] < r_hip[0] - 30:
+                            if r_wrist[0] > 0 and r_hip[0] > 0 and r_wrist[0] < r_hip[0] - 25:
                                 is_danger = True
 
                         if is_danger:
@@ -270,8 +242,8 @@ with col_right:
                         status_text = "NO TOOL (STANDBY)"
                         color = (180, 180, 180)
 
-                    cv2.putText(annotated_frame, status_text, (20, 40),
-                                cv2.FONT_HERSHEY_SIMPLEX, 0.8, color, 2)
+                    cv2.putText(annotated_frame, status_text, (15, 30),
+                                cv2.FONT_HERSHEY_SIMPLEX, 0.7, color, 2)
 
             annotated_frame_rgb = cv2.cvtColor(annotated_frame, cv2.COLOR_BGR2RGB)
             last_annotated_frame = annotated_frame_rgb
