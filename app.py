@@ -1,27 +1,23 @@
 import streamlit as st
 import cv2
+import numpy as np
 import tempfile
 import os
 import yt_dlp
 from ultralytics import YOLO
 
-# ページ全体の設定
 st.set_page_config(
     page_title="ForestSafe AI | 農林安全作業フォーム診断",
     page_icon="🌲",
     layout="wide"
 )
 
-# 解析結果を画面更新後も保持するための記憶領域（session_state）の初期化
 if "analysis_result" not in st.session_state:
     st.session_state.analysis_result = None
 
-# カスタムCSS
 st.markdown("""
 <style>
-    .stApp {
-        background-color: #f4f7f5;
-    }
+    .stApp { background-color: #f4f7f5; }
     .hero-banner {
         background: linear-gradient(135deg, #1b4332 0%, #2d6a4f 100%);
         padding: 2rem;
@@ -30,17 +26,8 @@ st.markdown("""
         margin-bottom: 1.5rem;
         box-shadow: 0 4px 15px rgba(27, 67, 50, 0.2);
     }
-    .hero-title {
-        font-size: 2.2rem;
-        font-weight: 800;
-        margin: 0;
-        letter-spacing: 0.03em;
-    }
-    .hero-subtitle {
-        font-size: 1.05rem;
-        color: #d8f3dc;
-        margin-top: 0.5rem;
-    }
+    .hero-title { font-size: 2.2rem; font-weight: 800; margin: 0; letter-spacing: 0.03em; }
+    .hero-subtitle { font-size: 1.05rem; color: #d8f3dc; margin-top: 0.5rem; }
     .ui-card {
         background-color: #ffffff;
         padding: 1.5rem;
@@ -72,28 +59,79 @@ st.markdown("""
 def load_model():
     return YOLO("yolo11n-pose.pt")
 
-# サイドバー
+# 手首周辺にチェンソー・刈払機を保持しているか判定する関数
+def is_holding_tool(frame, kpts, tool_type):
+    l_shoulder, r_shoulder = kpts[5], kpts[6]
+    l_elbow, r_elbow = kpts[7], kpts[8]
+    l_wrist, r_wrist = kpts[9], kpts[10]
+    l_hip, r_hip = kpts[11], kpts[12]
+
+    # 両手首が検出されていない場合は非保持とみなす
+    if l_wrist[0] <= 0 or r_wrist[0] <= 0:
+        return False
+
+    # 肩幅を基準スケールとして計算
+    shoulder_width = np.linalg.norm(l_shoulder - r_shoulder)
+    if shoulder_width < 15:
+        return False
+
+    # 両手首の距離チェック（チェンソー・刈払機は両手でハンドルを握るため一定幅を保つ）
+    wrist_dist = np.linalg.norm(l_wrist - r_wrist)
+    if wrist_dist < shoulder_width * 0.3 or wrist_dist > shoulder_width * 3.0:
+        return False
+
+    # 歩行中の垂れ下がり除外（少なくとも片方の肘が曲がって手首が腰より極端に下にないこと）
+    hip_y = max(l_hip[1], r_hip[1])
+    if hip_y > 0 and (l_wrist[1] > hip_y + shoulder_width * 0.6 and r_wrist[1] > hip_y + shoulder_width * 0.6):
+        return False
+
+    # 手首周辺領域（ROI）の抽出と視覚特徴（機械色・金属エッジ）チェック
+    h, w = frame.shape[:2]
+    cx = int((l_wrist[0] + r_wrist[0]) / 2)
+    cy = int((l_wrist[1] + r_wrist[1]) / 2)
+    margin = int(shoulder_width * 1.2)
+
+    x1, y1 = max(0, cx - margin), max(0, cy - margin)
+    x2, y2 = min(w, cx + margin), min(h, cy + margin)
+    roi = frame[y1:y2, x1:x2]
+
+    if roi.size == 0:
+        return False
+
+    # 機械ボディ色（オレンジ・赤・黄・青など高彩度色）または金属シャフト（強いエッジ）の検出
+    hsv = cv2.cvtColor(roi, cv2.COLOR_BGR2HSV)
+    # 彩度が高いピクセル（オレンジ・赤・青などの農林機械カラー）
+    high_sat_ratio = np.mean(hsv[:, :, 1] > 90)
+    # エッジ検出（バーやシャフトの直線輪郭）
+    gray = cv2.cvtColor(roi, cv2.COLOR_BGR2GRAY)
+    edges = cv2.Canny(gray, 80, 180)
+    edge_ratio = np.mean(edges > 0)
+
+    # 機械カラーまたは金属エッジが一定以上あれば「道具保持中」と判定
+    if high_sat_ratio > 0.04 or edge_ratio > 0.06:
+        return True
+
+    return False
+
 with st.sidebar:
     st.markdown("## 🌲 ForestSafe AI")
     st.caption("YOLO11 骨格推定による農林作業安全診断システム")
     st.divider()
     st.markdown("### 📋 安全判定の基準")
-    st.info("**🪚 チェンソーモード**\n\n手首が肩より高い位置に上がると、キックバックや顔面接触リスクとして「危険」と判定します。")
-    st.warning("**🌿 刈払機モード**\n\n右手首が腰より大きく右側へ振り抜かれると、跳ね返り（キックバック）リスクとして「危険」と判定します。")
+    st.info("**🪚 チェンソーモード**\n\nチェンソー保持中、手首が肩より高い位置に上がると「危険」と判定します。")
+    st.warning("**🌿 刈払機モード**\n\n刈払機保持中、右手首が腰より大きく右側へ振り抜かれると「危険」と判定します。")
+    st.success("**🔍 道具保持フィルタ搭載**\n\n道具を持たずに歩いているだけの場面は自動で除外し、作業中のみを診断します。")
     st.divider()
-    st.caption("💡 推奨：5〜15秒程度のMP4動画をアップロードすると最もスムーズに解析できます。")
     
-    # 結果をリセットするボタンも用意
     if st.session_state.analysis_result is not None:
         if st.button("🗑️ 診断結果をクリア"):
             st.session_state.analysis_result = None
             st.rerun()
 
-# トップバナー
 st.markdown("""
 <div class="hero-banner">
     <div class="hero-title">🌲 農林安全作業 フォーム診断AI</div>
-    <div class="hero-subtitle">AI骨格検出（YOLO11-Pose）で作業中の姿勢をリアルタイム分析し、安全率を定量評価します</div>
+    <div class="hero-subtitle">道具保持フィルタ＆AI骨格検出で「作業中の姿勢」だけを自動抽出し、安全率を定量評価します</div>
 </div>
 """, unsafe_allow_html=True)
 
@@ -162,7 +200,6 @@ with col_right:
     st.markdown('<div class="ui-card">', unsafe_allow_html=True)
     st.subheader("🖥️ 3. AI解析モニター & 診断レポート")
 
-    # 新しく解析ボタンが押されたときの処理
     if start_btn and video_path is not None:
         model = load_model()
         cap = cv2.VideoCapture(video_path)
@@ -177,6 +214,7 @@ with col_right:
 
         safe_frames = 0
         danger_frames = 0
+        standby_frames = 0
         last_annotated_frame = None
 
         while cap.isOpened():
@@ -201,34 +239,39 @@ with col_right:
             results = model(frame, verbose=False)
             annotated_frame = results[0].plot()
 
-            is_danger = False
-
             if results[0].keypoints is not None and len(results[0].keypoints.xy) > 0:
-                kpts = results[0].keypoints.xy[0]
+                kpts = results[0].keypoints.xy[0].cpu().numpy()
                 if len(kpts) >= 13:
-                    l_shoulder, r_shoulder = kpts[5], kpts[6]
-                    l_wrist, r_wrist = kpts[9], kpts[10]
-                    l_hip, r_hip = kpts[11], kpts[12]
+                    # 道具（チェンソー・刈払機）を持っているか判定
+                    if is_holding_tool(frame, kpts, tool_type):
+                        l_shoulder, r_shoulder = kpts[5], kpts[6]
+                        l_wrist, r_wrist = kpts[9], kpts[10]
+                        l_hip, r_hip = kpts[11], kpts[12]
 
-                    if tool_type == "チェンソー":
-                        if (l_wrist[1] > 0 and l_shoulder[1] > 0 and l_wrist[1] < l_shoulder[1]) or \
-                           (r_wrist[1] > 0 and r_shoulder[1] > 0 and r_wrist[1] < r_shoulder[1]):
-                            is_danger = True
+                        is_danger = False
+                        if tool_type == "チェンソー":
+                            if (l_wrist[1] > 0 and l_shoulder[1] > 0 and l_wrist[1] < l_shoulder[1]) or \
+                               (r_wrist[1] > 0 and r_shoulder[1] > 0 and r_wrist[1] < r_shoulder[1]):
+                                is_danger = True
+                        else:
+                            if r_wrist[0] > 0 and r_hip[0] > 0 and r_wrist[0] < r_hip[0] - 30:
+                                is_danger = True
+
+                        if is_danger:
+                            danger_frames += 1
+                            status_text = "DANGER! (HIGH / KICKBACK)"
+                            color = (0, 0, 255)
+                        else:
+                            safe_frames += 1
+                            status_text = "SAFE FORM"
+                            color = (0, 255, 0)
                     else:
-                        if r_wrist[0] > 0 and r_hip[0] > 0 and r_wrist[0] < r_hip[0] - 30:
-                            is_danger = True
+                        standby_frames += 1
+                        status_text = "NO TOOL (STANDBY)"
+                        color = (180, 180, 180)
 
-                if is_danger:
-                    danger_frames += 1
-                    status_text = "DANGER! (HIGH / KICKBACK)"
-                    color = (0, 0, 255)
-                else:
-                    safe_frames += 1
-                    status_text = "SAFE FORM"
-                    color = (0, 255, 0)
-
-                cv2.putText(annotated_frame, status_text, (20, 40),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.8, color, 2)
+                    cv2.putText(annotated_frame, status_text, (20, 40),
+                                cv2.FONT_HERSHEY_SIMPLEX, 0.8, color, 2)
 
             annotated_frame_rgb = cv2.cvtColor(annotated_frame, cv2.COLOR_BGR2RGB)
             last_annotated_frame = annotated_frame_rgb
@@ -238,7 +281,6 @@ with col_right:
         progress_bar.progress(100)
         progress_text.markdown("**✅ AI解析 100% 完了！**")
 
-        # 結果を session_state に保存（これで画面更新しても消えなくなる）
         total_detected = safe_frames + danger_frames
         if total_detected > 0:
             safe_rate = (safe_frames / total_detected) * 100
@@ -249,36 +291,36 @@ with col_right:
                 "danger_rate": danger_rate,
                 "safe_frames": safe_frames,
                 "danger_frames": danger_frames,
+                "standby_frames": standby_frames,
                 "last_frame": last_annotated_frame
             }
         else:
-            st.session_state.analysis_result = "no_person"
+            st.session_state.analysis_result = "no_tool_or_person"
 
-    # 保存された診断結果を表示（再描画時もここから表示される）
     res = st.session_state.analysis_result
-    if res == "no_person":
-        st.warning("動画内から作業者の骨格を十分に検出できませんでした。")
+    if res == "no_tool_or_person":
+        st.warning("動画内からチェンソー・刈払機を構えている作業姿勢を検出できませんでした。")
     elif res is not None:
-        # 解析直後ではない場合（他の操作で再描画された場合）は保存した画像を表示
         if not start_btn and res["last_frame"] is not None:
             st.image(res["last_frame"], caption=f"最終解析フレーム（{res['tool_type']}モード）", channels="RGB", use_container_width=True)
 
         st.divider()
         st.markdown(f"### 📊 フォーム安全診断レポート（{res['tool_type']}）")
-        m1, m2 = st.columns(2)
+        m1, m2, m3 = st.columns(3)
         m1.metric(label="🟢 安全フォーム率", value=f"{res['safe_rate']:.1f} %")
         m2.metric(label="🔴 危険フォーム率", value=f"{res['danger_rate']:.1f} %")
+        m3.metric(label="⚪ 非作業（除外）コマ", value=f"{res['standby_frames']} コマ")
 
         st.progress(int(res["safe_rate"]))
 
         if res["danger_rate"] >= 30.0:
-            st.error(f"⚠️ 危険姿勢が全体の **{res['danger_rate']:.1f}%** 検出されました。作業姿勢の改善が必要です。")
+            st.error(f"⚠️ 作業中の危険姿勢が **{res['danger_rate']:.1f}%** 検出されました。作業姿勢の改善が必要です。")
         elif res["danger_rate"] > 0:
-            st.warning(f"⚡ 一部（**{res['danger_rate']:.1f}%**）で危険な姿勢が見られました。注意して作業してください。")
+            st.warning(f"⚡ 作業中の一部（**{res['danger_rate']:.1f}%**）で危険な姿勢が見られました。注意して作業してください。")
         else:
             if start_btn:
                 st.balloons()
-            st.success("✨ 素晴らしいフォームです！全体を通して安全な姿勢が維持されています。")
+            st.success("✨ 素晴らしいフォームです！作業中を通して安全な姿勢が維持されています。")
     else:
         st.markdown("""
         <div style="text-align:center; padding: 4rem 1rem; color: #6c757d;">
