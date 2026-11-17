@@ -5,21 +5,23 @@ import os
 import yt_dlp
 from ultralytics import YOLO
 
-# ページ全体の設定（タブのタイトルとアイコン）
+# ページ全体の設定
 st.set_page_config(
     page_title="ForestSafe AI | 農林安全作業フォーム診断",
     page_icon="🌲",
     layout="wide"
 )
 
-# カスタムCSSでデザインをおしゃれに整える
+# 解析結果を画面更新後も保持するための記憶領域（session_state）の初期化
+if "analysis_result" not in st.session_state:
+    st.session_state.analysis_result = None
+
+# カスタムCSS
 st.markdown("""
 <style>
-    /* 全体の背景色 */
     .stApp {
         background-color: #f4f7f5;
     }
-    /* ヘッダーバナー */
     .hero-banner {
         background: linear-gradient(135deg, #1b4332 0%, #2d6a4f 100%);
         padding: 2rem;
@@ -39,7 +41,6 @@ st.markdown("""
         color: #d8f3dc;
         margin-top: 0.5rem;
     }
-    /* カード風コンテナ */
     .ui-card {
         background-color: #ffffff;
         padding: 1.5rem;
@@ -48,7 +49,6 @@ st.markdown("""
         border: 1px solid #e0e8e3;
         margin-bottom: 1rem;
     }
-    /* ボタンのデザイン */
     div.stButton > button {
         background: linear-gradient(90deg, #2d6a4f 0%, #40916c 100%);
         color: white;
@@ -72,7 +72,7 @@ st.markdown("""
 def load_model():
     return YOLO("yolo11n-pose.pt")
 
-# サイドバー（診断ガイド・判定基準）
+# サイドバー
 with st.sidebar:
     st.markdown("## 🌲 ForestSafe AI")
     st.caption("YOLO11 骨格推定による農林作業安全診断システム")
@@ -82,6 +82,12 @@ with st.sidebar:
     st.warning("**🌿 刈払機モード**\n\n右手首が腰より大きく右側へ振り抜かれると、跳ね返り（キックバック）リスクとして「危険」と判定します。")
     st.divider()
     st.caption("💡 推奨：5〜15秒程度のMP4動画をアップロードすると最もスムーズに解析できます。")
+    
+    # 結果をリセットするボタンも用意
+    if st.session_state.analysis_result is not None:
+        if st.button("🗑️ 診断結果をクリア"):
+            st.session_state.analysis_result = None
+            st.rerun()
 
 # トップバナー
 st.markdown("""
@@ -91,7 +97,6 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
-# 2カラムレイアウト（左：設定と入力 / 右：解析モニターと結果）
 col_left, col_right = st.columns([1, 1.3], gap="large")
 
 video_path = None
@@ -157,6 +162,7 @@ with col_right:
     st.markdown('<div class="ui-card">', unsafe_allow_html=True)
     st.subheader("🖥️ 3. AI解析モニター & 診断レポート")
 
+    # 新しく解析ボタンが押されたときの処理
     if start_btn and video_path is not None:
         model = load_model()
         cap = cv2.VideoCapture(video_path)
@@ -171,6 +177,7 @@ with col_right:
 
         safe_frames = 0
         danger_frames = 0
+        last_annotated_frame = None
 
         while cap.isOpened():
             ret, frame = cap.read()
@@ -223,35 +230,55 @@ with col_right:
                 cv2.putText(annotated_frame, status_text, (20, 40),
                             cv2.FONT_HERSHEY_SIMPLEX, 0.8, color, 2)
 
-            annotated_frame = cv2.cvtColor(annotated_frame, cv2.COLOR_BGR2RGB)
-            st_frame.image(annotated_frame, channels="RGB", use_container_width=True)
+            annotated_frame_rgb = cv2.cvtColor(annotated_frame, cv2.COLOR_BGR2RGB)
+            last_annotated_frame = annotated_frame_rgb
+            st_frame.image(annotated_frame_rgb, channels="RGB", use_container_width=True)
 
         cap.release()
         progress_bar.progress(100)
         progress_text.markdown("**✅ AI解析 100% 完了！**")
 
+        # 結果を session_state に保存（これで画面更新しても消えなくなる）
         total_detected = safe_frames + danger_frames
         if total_detected > 0:
             safe_rate = (safe_frames / total_detected) * 100
             danger_rate = (danger_frames / total_detected) * 100
-
-            st.divider()
-            st.markdown("### 📊 フォーム安全診断レポート")
-            m1, m2 = st.columns(2)
-            m1.metric(label="🟢 安全フォーム率", value=f"{safe_rate:.1f} %")
-            m2.metric(label="🔴 危険フォーム率", value=f"{danger_rate:.1f} %")
-
-            st.progress(int(safe_rate))
-
-            if danger_rate >= 30.0:
-                st.error(f"⚠️ 危険姿勢が全体の **{danger_rate:.1f}%** 検出されました。作業姿勢の改善が必要です。")
-            elif danger_rate > 0:
-                st.warning(f"⚡ 一部（**{danger_rate:.1f}%**）で危険な姿勢が見られました。注意して作業してください。")
-            else:
-                st.balloons()
-                st.success("✨ 素晴らしいフォームです！全体を通して安全な姿勢が維持されています。")
+            st.session_state.analysis_result = {
+                "tool_type": tool_type,
+                "safe_rate": safe_rate,
+                "danger_rate": danger_rate,
+                "safe_frames": safe_frames,
+                "danger_frames": danger_frames,
+                "last_frame": last_annotated_frame
+            }
         else:
-            st.warning("動画内から作業者の骨格を十分に検出できませんでした。")
+            st.session_state.analysis_result = "no_person"
+
+    # 保存された診断結果を表示（再描画時もここから表示される）
+    res = st.session_state.analysis_result
+    if res == "no_person":
+        st.warning("動画内から作業者の骨格を十分に検出できませんでした。")
+    elif res is not None:
+        # 解析直後ではない場合（他の操作で再描画された場合）は保存した画像を表示
+        if not start_btn and res["last_frame"] is not None:
+            st.image(res["last_frame"], caption=f"最終解析フレーム（{res['tool_type']}モード）", channels="RGB", use_container_width=True)
+
+        st.divider()
+        st.markdown(f"### 📊 フォーム安全診断レポート（{res['tool_type']}）")
+        m1, m2 = st.columns(2)
+        m1.metric(label="🟢 安全フォーム率", value=f"{res['safe_rate']:.1f} %")
+        m2.metric(label="🔴 危険フォーム率", value=f"{res['danger_rate']:.1f} %")
+
+        st.progress(int(res["safe_rate"]))
+
+        if res["danger_rate"] >= 30.0:
+            st.error(f"⚠️ 危険姿勢が全体の **{res['danger_rate']:.1f}%** 検出されました。作業姿勢の改善が必要です。")
+        elif res["danger_rate"] > 0:
+            st.warning(f"⚡ 一部（**{res['danger_rate']:.1f}%**）で危険な姿勢が見られました。注意して作業してください。")
+        else:
+            if start_btn:
+                st.balloons()
+            st.success("✨ 素晴らしいフォームです！全体を通して安全な姿勢が維持されています。")
     else:
         st.markdown("""
         <div style="text-align:center; padding: 4rem 1rem; color: #6c757d;">
