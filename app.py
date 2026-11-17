@@ -7,6 +7,11 @@ from ultralytics import YOLO
 
 st.title("農林安全作業 フォーム診断AI")
 
+# AIモデルをキャッシュして毎回読み込み直すのを防ぐ（高速化①）
+@st.cache_resource
+def load_model():
+    return YOLO("yolo11n-pose.pt")
+
 tool_type = st.radio("診断する作業ツールを選択してください:", ["チェンソー", "刈払機（草刈機）"])
 input_method = st.radio("動画の入力方法を選択してください:", ["動画ファイルをアップロード", "YouTubeリンクを貼り付け"])
 
@@ -50,12 +55,18 @@ else:
 
 if video_path is not None:
     if st.button("AI解析を開始"):
-        st.info("解析を開始しました...")
-        model = YOLO("yolo11n-pose.pt")
+        st.info("高速モードで解析を実行中...")
+        model = load_model()
         cap = cv2.VideoCapture(video_path)
+        
+        # 進捗バーと映像表示枠
+        progress_bar = st.progress(0)
         st_frame = st.empty()
 
-        # 安全・危険フレームのカウント用変数
+        total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+        frame_count = 0
+        skip_frames = 5  # 5コマに1回だけ解析して5倍速にする（高速化②）
+
         safe_frames = 0
         danger_frames = 0
         
@@ -64,50 +75,58 @@ if video_path is not None:
             if not ret:
                 break
             
+            frame_count += 1
+            if frame_count % skip_frames != 0:
+                continue
+
+            # 画像サイズを小さくしてAI処理を軽くする（高速化③）
+            h, w = frame.shape[:2]
+            if w > 640:
+                scale = 640 / w
+                frame = cv2.resize(frame, (640, int(h * scale)))
+
             results = model(frame, verbose=False)
             annotated_frame = results[0].plot()
             
             is_danger = False
 
-            # 骨格座標が検出された場合の判定ロジック
             if results[0].keypoints is not None and len(results[0].keypoints.xy) > 0:
                 kpts = results[0].keypoints.xy[0]
-                # YOLO11のキーポイント番号: 5=左肩, 6=右肩, 9=左手首, 10=右手首, 11=左腰, 12=右腰
                 if len(kpts) >= 13:
                     l_shoulder, r_shoulder = kpts[5], kpts[6]
                     l_wrist, r_wrist = kpts[9], kpts[10]
                     l_hip, r_hip = kpts[11], kpts[12]
 
                     if tool_type == "チェンソー":
-                        # 手首が肩より高い位置にある場合は危険（画像座標は上が0）
                         if (l_wrist[1] > 0 and l_shoulder[1] > 0 and l_wrist[1] < l_shoulder[1]) or \
                            (r_wrist[1] > 0 and r_shoulder[1] > 0 and r_wrist[1] < r_shoulder[1]):
                             is_danger = True
                     else:
-                        # 刈払機：右手首が右腰より大きく右側（画面左方向）へ振られている場合
-                        if r_wrist[0] > 0 and r_hip[0] > 0 and r_wrist[0] < r_hip[0] - 40:
+                        if r_wrist[0] > 0 and r_hip[0] > 0 and r_wrist[0] < r_hip[0] - 30:
                             is_danger = True
 
-                # カウントと画面上のリアルタイム表示
                 if is_danger:
                     danger_frames += 1
-                    status_text = "DANGER! (KICKBACK / HIGH POSITION)"
-                    color = (0, 0, 255)  # 赤色
+                    status_text = "DANGER! (HIGH / KICKBACK)"
+                    color = (0, 0, 255)
                 else:
                     safe_frames += 1
                     status_text = "SAFE FORM"
-                    color = (0, 255, 0)  # 緑色
+                    color = (0, 255, 0)
 
-                cv2.putText(annotated_frame, status_text, (40, 50),
-                            cv2.FONT_HERSHEY_SIMPLEX, 1.0, color, 3)
+                cv2.putText(annotated_frame, status_text, (20, 40),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.8, color, 2)
             
             annotated_frame = cv2.cvtColor(annotated_frame, cv2.COLOR_BGR2RGB)
             st_frame.image(annotated_frame, channels="RGB")
+
+            if total_frames > 0:
+                progress_bar.progress(min(frame_count / total_frames, 1.0))
             
         cap.release()
+        progress_bar.progress(1.0)
         st.success("解析が完了しました！")
 
-        # 診断結果のパーセンテージ表示
         total_detected = safe_frames + danger_frames
         if total_detected > 0:
             safe_rate = (safe_frames / total_detected) * 100
@@ -118,7 +137,6 @@ if video_path is not None:
             col1.metric(label="🟢 安全フォーム率", value=f"{safe_rate:.1f} %")
             col2.metric(label="🔴 危険フォーム率", value=f"{danger_rate:.1f} %")
 
-            # 視覚的な割合バーの表示
             st.progress(int(safe_rate))
 
             if danger_rate >= 30.0:
