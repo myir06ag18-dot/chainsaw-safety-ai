@@ -280,3 +280,248 @@ with col_left:
         <div class="sec-title">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#2D6A4F" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/>
+            </svg>
+            <span>02. 映像データの入力</span>
+        </div>
+        """, unsafe_allow_html=True)
+        tab1, tab2 = st.tabs(["動画ファイル", "YouTube URL"])
+
+        with tab1:
+            uploaded_file = st.file_uploader("MP4 / MOV / AVI 形式に対応", type=["mp4", "mov", "avi"])
+            if uploaded_file is not None:
+                tfile = tempfile.NamedTemporaryFile(delete=False, suffix=".mp4")
+                tfile.write(uploaded_file.read())
+                video_path = tfile.name
+                video_name = uploaded_file.name
+                st.caption(f"セット完了: {uploaded_file.name}")
+
+        with tab2:
+            youtube_url = st.text_input("動画URLを入力", placeholder="https://www.youtube.com/watch?v=...")
+            if youtube_url:
+                clean_url = youtube_url.split("?si=")[0]
+                with st.spinner("映像データを取得しています..."):
+                    try:
+                        temp_dir = tempfile.mkdtemp()
+                        output_path = os.path.join(temp_dir, "youtube_video.mp4")
+                        ydl_opts = {
+                            'format': 'best[ext=mp4]/best',
+                            'outtmpl': output_path,
+                            'quiet': True,
+                            'noplaylist': True,
+                            'geo_bypass': True,
+                            'nocheckcertificate': True,
+                            'extractor_args': {
+                                'youtube': {
+                                    'player_client': ['tv', 'ios', 'mweb']
+                                }
+                            }
+                        }
+                        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                            ydl.download([clean_url])
+                        video_path = output_path
+                        video_name = clean_url
+                        st.caption("映像データの取得が完了しました。")
+                    except Exception as e:
+                        st.error("URLからの直接取得に失敗しました。動画ファイルタブをご利用ください。")
+
+    if video_path is not None:
+        start_btn = st.button("解析を実行する")
+    else:
+        start_btn = False
+        st.caption("映像データをセットすると解析ボタンが有効になります。")
+
+with col_right:
+    with st.container(border=True):
+        st.markdown("""
+        <div class="sec-title">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#2D6A4F" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+            </svg>
+            <span>03. 解析モニター・診断レポート</span>
+        </div>
+        """, unsafe_allow_html=True)
+
+        if start_btn and video_path is not None:
+            model = load_model()
+            cap = cv2.VideoCapture(video_path)
+
+            progress_text = st.empty()
+            progress_bar = st.progress(0)
+            st_frame = st.empty()
+
+            total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+            frame_count = 0
+            skip_frames = 8
+
+            safe_frames = 0
+            danger_frames = 0
+            standby_frames = 0
+            last_annotated_frame = None
+
+            while cap.isOpened():
+                ret, frame = cap.read()
+                if not ret:
+                    break
+
+                frame_count += 1
+                if frame_count % skip_frames != 0:
+                    continue
+
+                if total_frames > 0:
+                    percent = min(int((frame_count / total_frames) * 100), 100)
+                    progress_bar.progress(percent)
+                    progress_text.caption(f"解析進行度: {percent}%")
+
+                h, w = frame.shape[:2]
+                if w > 480:
+                    scale = 480 / w
+                    frame = cv2.resize(frame, (480, int(h * scale)))
+
+                results = model(frame, verbose=False)
+                annotated_frame = results[0].plot()
+
+                if results[0].keypoints is not None and len(results[0].keypoints.xy) > 0:
+                    kpts = results[0].keypoints.xy[0].cpu().numpy()
+                    if len(kpts) >= 13:
+                        if is_holding_tool_fast(kpts):
+                            l_shoulder, r_shoulder = kpts[5], kpts[6]
+                            l_wrist, r_wrist = kpts[9], kpts[10]
+                            l_hip, r_hip = kpts[11], kpts[12]
+
+                            is_danger = False
+                            if tool_type == "チェンソー":
+                                if (l_wrist[1] > 0 and l_shoulder[1] > 0 and l_wrist[1] < l_shoulder[1]) or \
+                                   (r_wrist[1] > 0 and r_shoulder[1] > 0 and r_wrist[1] < r_shoulder[1]):
+                                    is_danger = True
+                            else:
+                                if r_wrist[0] > 0 and r_hip[0] > 0 and r_wrist[0] < r_hip[0] - 25:
+                                    is_danger = True
+
+                            if is_danger:
+                                danger_frames += 1
+                                status_text = "DANGER"
+                                color = (0, 0, 255)
+                            else:
+                                safe_frames += 1
+                                status_text = "SAFE"
+                                color = (0, 200, 0)
+                        else:
+                            standby_frames += 1
+                            status_text = "STANDBY"
+                            color = (180, 180, 180)
+
+                        cv2.putText(annotated_frame, status_text, (15, 30),
+                                    cv2.FONT_HERSHEY_SIMPLEX, 0.75, color, 2)
+
+                annotated_frame_rgb = cv2.cvtColor(annotated_frame, cv2.COLOR_BGR2RGB)
+                last_annotated_frame = annotated_frame_rgb
+                st_frame.image(annotated_frame_rgb, channels="RGB", use_container_width=True)
+
+            cap.release()
+            progress_bar.progress(100)
+            progress_text.caption("解析進行度: 100%（完了）")
+
+            jst = timezone(timedelta(hours=9))
+            now_str = datetime.now(jst).strftime("%Y-%m-%d %H:%M:%S")
+
+            total_detected = safe_frames + danger_frames
+            if total_detected > 0:
+                safe_rate = (safe_frames / total_detected) * 100
+                danger_rate = (danger_frames / total_detected) * 100
+                st.session_state.analysis_result = {
+                    "tool_type": tool_type,
+                    "safe_rate": safe_rate,
+                    "danger_rate": danger_rate,
+                    "safe_frames": safe_frames,
+                    "danger_frames": danger_frames,
+                    "standby_frames": standby_frames,
+                    "last_frame": last_annotated_frame
+                }
+                new_record = {
+                    "診断日時": now_str,
+                    "映像ファイル": video_name,
+                    "対象機材": tool_type,
+                    "安全フォーム率 (%)": round(safe_rate, 1),
+                    "危険フォーム率 (%)": round(danger_rate, 1),
+                    "有効作業コマ": total_detected,
+                    "除外コマ": standby_frames
+                }
+            else:
+                st.session_state.analysis_result = "no_tool_or_person"
+                new_record = {
+                    "診断日時": now_str,
+                    "映像ファイル": video_name,
+                    "対象機材": tool_type,
+                    "安全フォーム率 (%)": 0.0,
+                    "危険フォーム率 (%)": 0.0,
+                    "有効作業コマ": 0,
+                    "除外コマ": standby_frames
+                }
+
+            st.session_state.history.insert(0, new_record)
+            save_history(st.session_state.history)
+
+        res = st.session_state.analysis_result
+        if res == "no_tool_or_person":
+            st.warning("映像内から対象機材を保持した作業姿勢が検出されませんでした。")
+        elif res is not None:
+            if not start_btn and res["last_frame"] is not None:
+                st.image(res["last_frame"], caption=f"最終解析フレーム（{res['tool_type']}）", channels="RGB", use_container_width=True)
+
+            st.markdown(f"""
+            <div class="kpi-grid">
+                <div class="kpi-box">
+                    <div class="kpi-label">安全フォーム率</div>
+                    <div class="kpi-val-safe">{res['safe_rate']:.1f}<span style="font-size:0.95rem;"> %</span></div>
+                </div>
+                <div class="kpi-box">
+                    <div class="kpi-label">危険フォーム率</div>
+                    <div class="kpi-val-danger">{res['danger_rate']:.1f}<span style="font-size:0.95rem;"> %</span></div>
+                </div>
+                <div class="kpi-box">
+                    <div class="kpi-label">非作業除外コマ</div>
+                    <div class="kpi-val-neutral">{res['standby_frames']}<span style="font-size:0.95rem;"> コマ</span></div>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+
+            st.progress(int(res["safe_rate"]))
+
+            if res["danger_rate"] >= 30.0:
+                st.error(f"評価所見: 作業中の危険姿勢が {res['danger_rate']:.1f}% 検出されました。作業フォームの改善が必要です。")
+            elif res["danger_rate"] > 0:
+                st.warning(f"評価所見: 一部区間（{res['danger_rate']:.1f}%）で危険姿勢が確認されました。")
+            else:
+                st.success("評価所見: 全作業区間を通じて安全なフォームが維持されています。")
+        else:
+            st.markdown("""
+            <div style="text-align:center; padding: 5.5rem 1rem; color: #646E68; background-color: #FAF9F6; border-radius: 10px; border: 1px dashed #D5D1C8;">
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#8C9690" stroke-width="1.5" style="margin-bottom: 0.75rem;">
+                    <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/>
+                </svg>
+                <div style="font-size: 0.98rem; font-weight: 600; color: #181C1A; margin-bottom: 0.35rem;">解析スタンバイ</div>
+                <div style="font-size: 0.85rem;">左側のパネルから対象機材と映像データを指定し、「解析を実行する」を選択してください。</div>
+            </div>
+            """, unsafe_allow_html=True)
+
+if len(st.session_state.history) > 0:
+    st.markdown("<br>", unsafe_allow_html=True)
+    with st.container(border=True):
+        st.markdown("""
+        <div class="sec-title">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#2D6A4F" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/>
+            </svg>
+            <span>診断履歴アーカイブ</span>
+        </div>
+        """, unsafe_allow_html=True)
+        df_history = pd.DataFrame(st.session_state.history)
+        st.dataframe(df_history, use_container_width=True, hide_index=True)
+
+        csv_data = df_history.to_csv(index=False).encode("utf-8-sig")
+        st.download_button(
+            label="CSV形式で履歴をエクスポート",
+            data=csv_data,
+            file_name="forest_safety_history.csv",
+            mime="text/csv"
+        )
