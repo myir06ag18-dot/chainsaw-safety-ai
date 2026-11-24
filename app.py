@@ -28,10 +28,8 @@ def save_history(history_list):
     df = pd.DataFrame(history_list)
     df.to_csv(HISTORY_FILE, index=False, encoding="utf-8-sig")
 
-# YouTubeのあらゆるURL形式（通常・短縮・Shorts・余分なパラメータ付き）を正規化する関数
 def normalize_youtube_url(raw_url: str) -> str:
     url = raw_url.strip()
-    # 動画ID（11文字）を抽出して標準URLに統一
     patterns = [
         r"(?:v=|\/v\/|embed\/|youtu\.be\/|\/shorts\/)([a-zA-Z0-9_-]{11})"
     ]
@@ -41,7 +39,7 @@ def normalize_youtube_url(raw_url: str) -> str:
             return f"https://www.youtube.com/watch?v={match.group(1)}"
     return url
 
-# YouTube動画を1回だけ取得してキャッシュする関数（解析ボタン押下時の再取得エラーを防止）
+# 音声不要の映像ストリーム(bestvideo)を優先して「Requested format is not available」を回避
 def fetch_youtube_video(url: str):
     clean_url = normalize_youtube_url(url)
     if st.session_state.get("yt_cached_url") == clean_url and st.session_state.get("yt_cached_path"):
@@ -49,39 +47,33 @@ def fetch_youtube_video(url: str):
             return st.session_state["yt_cached_path"], clean_url, None
 
     temp_dir = tempfile.mkdtemp()
-    output_path = os.path.join(temp_dir, "youtube_video.mp4")
+    output_template = os.path.join(temp_dir, "youtube_video.%(ext)s")
 
-    # 複数のクライアント設定を順番に試してブロックを回避（720p以下の軽量MP4を優先）
-    client_profiles = [
-        ['android_vr', 'tv_embedded'],
-        ['ios', 'mweb'],
-        ['web']
+    format_candidates = [
+        "bestvideo[height<=720][ext=mp4]/bestvideo[height<=720]/best[height<=720]/best",
+        "bestvideo/best"
     ]
 
     last_error = ""
-    for clients in client_profiles:
+    for fmt in format_candidates:
         ydl_opts = {
-            'format': 'best[ext=mp4][height<=720]/best[ext=mp4]/best',
-            'outtmpl': output_path,
-            'quiet': True,
-            'no_warnings': True,
-            'noplaylist': True,
-            'geo_bypass': True,
-            'nocheckcertificate': True,
-            'socket_timeout': 20,
-            'extractor_args': {
-                'youtube': {
-                    'player_client': clients
-                }
-            }
+            "format": fmt,
+            "outtmpl": output_template,
+            "quiet": True,
+            "no_warnings": True,
+            "noplaylist": True,
+            "geo_bypass": True,
+            "nocheckcertificate": True,
+            "socket_timeout": 20,
         }
         try:
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                ydl.download([clean_url])
-            if os.path.exists(output_path) and os.path.getsize(output_path) > 0:
+                info = ydl.extract_info(clean_url, download=True)
+                downloaded_path = ydl.prepare_filename(info)
+            if os.path.exists(downloaded_path) and os.path.getsize(downloaded_path) > 0:
                 st.session_state["yt_cached_url"] = clean_url
-                st.session_state["yt_cached_path"] = output_path
-                return output_path, clean_url, None
+                st.session_state["yt_cached_path"] = downloaded_path
+                return downloaded_path, clean_url, None
         except Exception as e:
             last_error = str(e)
             continue
@@ -92,7 +84,6 @@ if "analysis_result" not in st.session_state:
     st.session_state.analysis_result = None
 st.session_state.history = load_history()
 
-# 洗練されたモダン・フィールドテック風CSS
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700&family=Noto+Sans+JP:wght@400;500;700&display=swap');
@@ -263,7 +254,6 @@ def is_holding_tool_fast(kpts):
 
     return True
 
-# サイドバー
 with st.sidebar:
     st.markdown("""
     <div style="padding: 0.5rem 0 1rem 0;">
@@ -290,7 +280,6 @@ with st.sidebar:
                 os.remove(HISTORY_FILE)
             st.rerun()
 
-# モダンヘッダーバナー
 st.markdown("""
 <div class="modern-header">
     <div>
