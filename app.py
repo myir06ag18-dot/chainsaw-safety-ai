@@ -9,8 +9,7 @@ import yt_dlp
 from ultralytics import YOLO
 
 st.set_page_config(
-    page_title="ForestSafe AI | 農林安全作業フォーム診断",
-    page_icon="🌲",
+    page_title="ForestSafe | 農林作業安全フォーム診断システム",
     layout="wide"
 )
 
@@ -32,90 +31,94 @@ if "analysis_result" not in st.session_state:
     st.session_state.analysis_result = None
 st.session_state.history = load_history()
 
-# おしゃれなフォレスト地形図パターン背景 ＋ ガラス風カードデザイン
+# 洗練された業務用Webシステム風CSS（Noto Sans JP導入・絵文字排除・ミニマル配色）
 st.markdown("""
 <style>
-    /* 背景：森林グラデーション ＋ 山の等高線（トポグラフィック）パターン */
-    .stApp {
-        background-color: #e6f0ec;
-        background-image: 
-            radial-gradient(at 15% 15%, rgba(116, 198, 157, 0.25) 0px, transparent 50%),
-            radial-gradient(at 85% 80%, rgba(45, 106, 79, 0.20) 0px, transparent 50%),
-            url("data:image/svg+xml,%3Csvg width='120' height='120' viewBox='0 0 120 120' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M0 20 Q 30 5, 60 20 T 120 20 M0 50 Q 30 35, 60 50 T 120 50 M0 80 Q 30 65, 60 80 T 120 80 M0 110 Q 30 95, 60 110 T 120 110' fill='none' stroke='%232d6a4f' stroke-opacity='0.08' stroke-width='1.5'/%3E%3C/svg%3E");
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@500;600;700&family=Noto+Sans+JP:wght@400;500;700&display=swap');
+
+    html, body, [class*="css"] {
+        font-family: 'Inter', 'Noto Sans JP', sans-serif;
+        color: #1f2937;
     }
 
-    /* ヘッダーの透明化 */
+    /* 背景：落ち着いたスレート・オフホワイト */
+    .stApp {
+        background-color: #f4f6f5;
+    }
+
     header[data-testid="stHeader"] {
         background: transparent !important;
     }
 
-    /* サイドバー：すりガラス風デザイン */
+    /* サイドバー */
     section[data-testid="stSidebar"] {
-        background: rgba(255, 255, 255, 0.78) !important;
-        backdrop-filter: blur(12px);
-        border-right: 1px solid rgba(45, 106, 79, 0.15);
+        background-color: #ffffff !important;
+        border-right: 1px solid #e5e7eb;
     }
 
-    /* メインのヒーローバナー：木漏れ日をイメージした深緑グラデーション */
-    .hero-banner {
-        background: linear-gradient(120deg, #132a13 0%, #1b4332 45%, #2d6a4f 100%);
-        padding: 2.2rem 2.5rem;
-        border-radius: 20px;
-        color: white;
+    /* トップヘッダー（シンプルで重厚感のある業務システム風） */
+    .app-header {
+        background-color: #18362a;
+        padding: 1.75rem 2.25rem;
+        border-radius: 12px;
+        color: #ffffff;
         margin-bottom: 1.5rem;
-        box-shadow: 0 10px 25px rgba(27, 67, 50, 0.22);
-        border: 1px solid rgba(255, 255, 255, 0.15);
-        position: relative;
-        overflow: hidden;
+        border-left: 6px solid #40916c;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
     }
-    .hero-banner::after {
-        content: "🌲";
-        position: absolute;
-        right: 25px;
-        bottom: -15px;
-        font-size: 7rem;
-        opacity: 0.12;
-        pointer-events: none;
+    .app-header-tag {
+        font-size: 0.75rem;
+        font-weight: 600;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: #95d5b2;
+        margin-bottom: 0.35rem;
     }
-    .hero-title {
-        font-size: 2.2rem;
-        font-weight: 800;
+    .app-header-title {
+        font-size: 1.75rem;
+        font-weight: 700;
         margin: 0;
-        letter-spacing: 0.04em;
-        text-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        letter-spacing: 0.02em;
     }
-    .hero-subtitle {
-        font-size: 1.05rem;
-        color: #d8f3dc;
-        margin-top: 0.5rem;
+    .app-header-desc {
+        font-size: 0.92rem;
+        color: #d1fae5;
+        margin-top: 0.4rem;
+        font-weight: 400;
     }
 
-    /* コンテナ（border=True）を半透明のガラス風カードにする */
+    /* カードコンテナ */
     div[data-testid="stVerticalBlockBorderWrapper"] {
-        background: rgba(255, 255, 255, 0.85) !important;
-        backdrop-filter: blur(10px);
-        border-radius: 16px !important;
-        border: 1px solid rgba(255, 255, 255, 0.9) !important;
-        box-shadow: 0 6px 20px rgba(27, 67, 50, 0.07) !important;
+        background-color: #ffffff !important;
+        border-radius: 10px !important;
+        border: 1px solid #e2e8f0 !important;
+        box-shadow: 0 1px 4px rgba(0, 0, 0, 0.03) !important;
         padding: 0.5rem !important;
     }
 
-    /* メインボタンの立体グラデーション */
+    /* 見出しのスタイル調整 */
+    h3 {
+        font-size: 1.1rem !important;
+        font-weight: 700 !important;
+        color: #111827 !important;
+        letter-spacing: 0.01em;
+    }
+
+    /* プライマリボタン（フラットで洗練された質感） */
     div.stButton > button {
-        background: linear-gradient(90deg, #1b4332 0%, #2d6a4f 50%, #40916c 100%);
-        color: white;
-        font-weight: bold;
+        background-color: #1e4636;
+        color: #ffffff;
+        font-weight: 600;
         border: none;
-        border-radius: 12px;
-        padding: 0.75rem 1.5rem;
-        font-size: 1.1rem;
+        border-radius: 8px;
+        padding: 0.7rem 1.25rem;
+        font-size: 0.98rem;
         width: 100%;
-        transition: all 0.25s ease;
-        box-shadow: 0 6px 15px rgba(45, 106, 79, 0.3);
+        transition: background-color 0.2s ease;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
     }
     div.stButton > button:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 8px 20px rgba(45, 106, 79, 0.45);
+        background-color: #2d6a4f;
         color: #ffffff;
     }
 </style>
@@ -148,17 +151,22 @@ def is_holding_tool_fast(kpts):
     return True
 
 with st.sidebar:
-    st.markdown("## 🌲 ForestSafe AI")
-    st.caption("YOLO11 骨格推定による農林作業安全診断システム")
+    st.markdown("### ForestSafe System")
+    st.caption("農林作業 姿勢安全評価プラットフォーム")
     st.divider()
-    st.markdown("### 📋 安全判定の基準")
-    st.info("**🪚 チェンソーモード**\n\nチェンソー保持中、手首が肩より高い位置に上がると「危険」と判定します。")
-    st.warning("**🌿 刈払機モード**\n\n刈払機保持中、右手首が腰より大きく右側へ振り抜かれると「危険」と判定します。")
-    st.success("**⚡ 高速保持フィルタ搭載**\n\n骨格座標の構え方から作業中のみを瞬時に抽出し、非作業シーンを除外します。")
+    st.markdown("**判定基準仕様**")
+    st.markdown("""
+    - **チェンソー作業**  
+      機材保持中、手首位置が肩ラインを超過した場合に危険姿勢と判定します。
+    - **刈払機（草刈機）作業**  
+      機材保持中、右手首が腰ラインより大きく右側へ振り抜かれた場合に危険姿勢と判定します。
+    - **非作業区間の自動除外**  
+      骨格座標から機材保持状態を判別し、移動・待機中のフレームは集計から除外します。
+    """)
     st.divider()
     
     if st.session_state.analysis_result is not None or len(st.session_state.history) > 0:
-        if st.button("🗑️ 保存された履歴をすべて削除"):
+        if st.button("診断履歴データを初期化"):
             st.session_state.analysis_result = None
             st.session_state.history = []
             if os.path.exists(HISTORY_FILE):
@@ -166,44 +174,45 @@ with st.sidebar:
             st.rerun()
 
 st.markdown("""
-<div class="hero-banner">
-    <div class="hero-title">🌲 農林安全作業 フォーム診断AI</div>
-    <div class="hero-subtitle">道具保持フィルタ＆AI骨格検出で「作業中の姿勢」だけを自動抽出し、安全率を定量評価します</div>
+<div class="app-header">
+    <div class="app-header-tag">FORESTRY SAFETY MANAGEMENT</div>
+    <div class="app-header-title">農林作業 安全フォーム診断システム</div>
+    <div class="app-header-desc">骨格推定モデルと作業姿勢フィルタにより、稼働中の安全率を定量評価します</div>
 </div>
 """, unsafe_allow_html=True)
 
-col_left, col_right = st.columns([1, 1.3], gap="large")
+col_left, col_right = st.columns([1, 1.35], gap="large")
 
 video_path = None
 video_name = "未指定"
 
 with col_left:
     with st.container(border=True):
-        st.subheader("⚙️ 1. 診断設定")
+        st.subheader("1. 対象機材の選択")
         tool_type = st.radio(
-            "使用する作業ツールを選択",
+            "診断対象とする作業機材を選択してください",
             ["チェンソー", "刈払機（草刈機）"],
             horizontal=True
         )
 
     with st.container(border=True):
-        st.subheader("🎥 2. 動画の読み込み")
-        tab1, tab2 = st.tabs(["📁 動画ファイルをアップロード", "🔗 YouTubeリンク"])
+        st.subheader("2. 映像データの入力")
+        tab1, tab2 = st.tabs(["動画ファイル", "YouTube URL"])
 
         with tab1:
-            uploaded_file = st.file_uploader("MP4 / MOV / AVI 形式に対応", type=["mp4", "mov", "avi"])
+            uploaded_file = st.file_uploader("対応形式: MP4 / MOV / AVI", type=["mp4", "mov", "avi"])
             if uploaded_file is not None:
                 tfile = tempfile.NamedTemporaryFile(delete=False, suffix=".mp4")
                 tfile.write(uploaded_file.read())
                 video_path = tfile.name
                 video_name = uploaded_file.name
-                st.success("✅ 動画のセットが完了しました")
+                st.caption(f"読み込み完了: {uploaded_file.name}")
 
         with tab2:
-            youtube_url = st.text_input("YouTubeのURLを貼り付け", placeholder="https://www.youtube.com/watch?v=...")
+            youtube_url = st.text_input("動画URLを入力", placeholder="https://www.youtube.com/watch?v=...")
             if youtube_url:
                 clean_url = youtube_url.split("?si=")[0]
-                with st.spinner("YouTube動画を準備中..."):
+                with st.spinner("映像データを取得しています..."):
                     try:
                         temp_dir = tempfile.mkdtemp()
                         output_path = os.path.join(temp_dir, "youtube_video.mp4")
@@ -224,19 +233,19 @@ with col_left:
                             ydl.download([clean_url])
                         video_path = output_path
                         video_name = clean_url
-                        st.success("✅ YouTube動画の読み込み完了")
+                        st.caption("映像データの取得が完了しました。")
                     except Exception as e:
-                        st.error("YouTube側の制限により直接読み込めませんでした。「動画ファイルをアップロード」タブをご利用ください。")
+                        st.error("URLからの直接取得に失敗しました。動画ファイルタブからアップロードしてください。")
 
     if video_path is not None:
-        start_btn = st.button("🚀 AIフォーム診断を開始する")
+        start_btn = st.button("解析を実行する")
     else:
         start_btn = False
-        st.info("👈 動画をアップロードすると診断ボタンが表示されます")
+        st.caption("映像データをセットすると解析を実行できます。")
 
 with col_right:
     with st.container(border=True):
-        st.subheader("🖥️ 3. AI解析モニター & 診断レポート")
+        st.subheader("3. 解析モニター・診断結果")
 
         if start_btn and video_path is not None:
             model = load_model()
@@ -267,7 +276,7 @@ with col_right:
                 if total_frames > 0:
                     percent = min(int((frame_count / total_frames) * 100), 100)
                     progress_bar.progress(percent)
-                    progress_text.markdown(f"**⏳ AI骨格解析を実行中... {percent}% 完了**")
+                    progress_text.caption(f"処理状況: {percent}% 完了")
 
                 h, w = frame.shape[:2]
                 if w > 480:
@@ -296,19 +305,19 @@ with col_right:
 
                             if is_danger:
                                 danger_frames += 1
-                                status_text = "DANGER! (HIGH / KICKBACK)"
+                                status_text = "DANGER"
                                 color = (0, 0, 255)
                             else:
                                 safe_frames += 1
-                                status_text = "SAFE FORM"
-                                color = (0, 255, 0)
+                                status_text = "SAFE"
+                                color = (0, 200, 0)
                         else:
                             standby_frames += 1
-                            status_text = "NO TOOL (STANDBY)"
+                            status_text = "STANDBY"
                             color = (180, 180, 180)
 
                         cv2.putText(annotated_frame, status_text, (15, 30),
-                                    cv2.FONT_HERSHEY_SIMPLEX, 0.7, color, 2)
+                                    cv2.FONT_HERSHEY_SIMPLEX, 0.75, color, 2)
 
                 annotated_frame_rgb = cv2.cvtColor(annotated_frame, cv2.COLOR_BGR2RGB)
                 last_annotated_frame = annotated_frame_rgb
@@ -316,7 +325,7 @@ with col_right:
 
             cap.release()
             progress_bar.progress(100)
-            progress_text.markdown("**✅ AI解析 100% 完了！**")
+            progress_text.caption("処理状況: 100% 完了")
 
             jst = timezone(timedelta(hours=9))
             now_str = datetime.now(jst).strftime("%Y-%m-%d %H:%M:%S")
@@ -336,23 +345,23 @@ with col_right:
                 }
                 new_record = {
                     "診断日時": now_str,
-                    "動画名": video_name,
-                    "作業ツール": tool_type,
+                    "映像ファイル": video_name,
+                    "対象機材": tool_type,
                     "安全フォーム率 (%)": round(safe_rate, 1),
                     "危険フォーム率 (%)": round(danger_rate, 1),
-                    "作業コマ数": total_detected,
-                    "非作業コマ数": standby_frames
+                    "有効作業コマ": total_detected,
+                    "除外コマ": standby_frames
                 }
             else:
                 st.session_state.analysis_result = "no_tool_or_person"
                 new_record = {
                     "診断日時": now_str,
-                    "動画名": video_name,
-                    "作業ツール": tool_type,
+                    "映像ファイル": video_name,
+                    "対象機材": tool_type,
                     "安全フォーム率 (%)": 0.0,
                     "危険フォーム率 (%)": 0.0,
-                    "作業コマ数": 0,
-                    "非作業コマ数": standby_frames
+                    "有効作業コマ": 0,
+                    "除外コマ": standby_frames
                 }
 
             st.session_state.history.insert(0, new_record)
@@ -360,47 +369,44 @@ with col_right:
 
         res = st.session_state.analysis_result
         if res == "no_tool_or_person":
-            st.warning("動画内からチェンソー・刈払機を構えている作業姿勢を検出できませんでした。")
+            st.warning("映像内から対象機材を保持した作業姿勢が検出されませんでした。")
         elif res is not None:
             if not start_btn and res["last_frame"] is not None:
-                st.image(res["last_frame"], caption=f"最終解析フレーム（{res['tool_type']}モード）", channels="RGB", use_container_width=True)
+                st.image(res["last_frame"], caption=f"最終解析フレーム（{res['tool_type']}）", channels="RGB", use_container_width=True)
 
             st.divider()
-            st.markdown(f"### 📊 フォーム安全診断レポート（{res['tool_type']}）")
+            st.markdown(f"**評価サマリー（{res['tool_type']}）**")
             m1, m2, m3 = st.columns(3)
-            m1.metric(label="🟢 安全フォーム率", value=f"{res['safe_rate']:.1f} %")
-            m2.metric(label="🔴 危険フォーム率", value=f"{res['danger_rate']:.1f} %")
-            m3.metric(label="⚪ 非作業（除外）コマ", value=f"{res['standby_frames']} コマ")
+            m1.metric(label="安全フォーム率", value=f"{res['safe_rate']:.1f} %")
+            m2.metric(label="危険フォーム率", value=f"{res['danger_rate']:.1f} %")
+            m3.metric(label="非作業除外コマ", value=f"{res['standby_frames']} コマ")
 
             st.progress(int(res["safe_rate"]))
 
             if res["danger_rate"] >= 30.0:
-                st.error(f"⚠️ 作業中の危険姿勢が **{res['danger_rate']:.1f}%** 検出されました。作業姿勢の改善が必要です。")
+                st.error(f"評価結果: 作業中の危険姿勢が {res['danger_rate']:.1f}% 検出されました。作業姿勢の是正が推奨されます。")
             elif res["danger_rate"] > 0:
-                st.warning(f"⚡ 作業中の一部（**{res['danger_rate']:.1f}%**）で危険な姿勢が見られました。注意して作業してください。")
+                st.warning(f"評価結果: 一部区間（{res['danger_rate']:.1f}%）で危険姿勢が検出されました。")
             else:
-                if start_btn:
-                    st.balloons()
-                st.success("✨ 素晴らしいフォームです！作業中を通して安全な姿勢が維持されています。")
+                st.success("評価結果: 全作業区間を通じて適正な作業姿勢が維持されています。")
         else:
             st.markdown("""
-            <div style="text-align:center; padding: 4.5rem 1rem; color: #495057;">
-                <div style="font-size: 3rem; margin-bottom: 0.5rem;">🌲🎥</div>
-                <h3 style="color: #1b4332; margin-bottom: 0.5rem;">AI解析スタンバイ中</h3>
-                <p style="font-size: 0.95rem;">左側のパネルから作業ツールと動画を選択し、<br>「AIフォーム診断を開始する」ボタンを押してください。</p>
+            <div style="text-align:center; padding: 5rem 1rem; color: #6b7280; background-color: #f9fafb; border-radius: 8px; border: 1px dashed #d1d5db;">
+                <div style="font-size: 1rem; font-weight: 600; color: #374151; margin-bottom: 0.4rem;">解析待機中</div>
+                <div style="font-size: 0.88rem;">左側のパネルから対象機材と映像データを指定し、「解析を実行する」を選択してください。</div>
             </div>
             """, unsafe_allow_html=True)
 
 if len(st.session_state.history) > 0:
     st.markdown("<br>", unsafe_allow_html=True)
     with st.container(border=True):
-        st.subheader("📋 診断履歴一覧（新しい順・自動保存）")
+        st.subheader("診断履歴ログ")
         df_history = pd.DataFrame(st.session_state.history)
         st.dataframe(df_history, use_container_width=True, hide_index=True)
 
         csv_data = df_history.to_csv(index=False).encode("utf-8-sig")
         st.download_button(
-            label="📥 診断履歴をCSVでダウンロード",
+            label="CSV形式で履歴を出力",
             data=csv_data,
             file_name="forest_safety_history.csv",
             mime="text/csv"
