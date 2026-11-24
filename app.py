@@ -6,7 +6,7 @@ from datetime import datetime, timezone, timedelta
 import tempfile
 import os
 import re
-import yt_dlp
+import yt-dlp>=2026.1.1
 from ultralytics import YOLO
 
 st.set_page_config(
