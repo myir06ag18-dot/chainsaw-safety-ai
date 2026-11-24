@@ -89,47 +89,56 @@ if "analysis_result" not in st.session_state:
     st.session_state.analysis_result = None
 st.session_state.history = load_history()
 
+# フルダークモード・フィールドテックCSS（白さを完全に排除）
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700&family=Noto+Sans+JP:wght@400;500;700&display=swap');
 
     html, body, [class*="css"] {
         font-family: 'Plus Jakarta Sans', 'Noto Sans JP', sans-serif;
-        color: #181C1A;
+        color: #E6ECE9;
     }
 
+    /* 全体背景：マットな漆黒×ディープフォレスト */
     .stApp {
-        background-color: #F5F4F0;
+        background-color: #0D1210;
+        background-image: radial-gradient(circle at 18% 12%, rgba(45, 106, 79, 0.16) 0%, transparent 45%),
+                          radial-gradient(circle at 85% 88%, rgba(27, 67, 50, 0.18) 0%, transparent 50%);
     }
 
     header[data-testid="stHeader"] {
         background: transparent !important;
     }
 
+    /* サイドバー：ダークスレート */
     section[data-testid="stSidebar"] {
-        background-color: #ECEAE4 !important;
-        border-right: 1px solid #DCD9D0;
+        background-color: #111715 !important;
+        border-right: 1px solid #222D28;
+    }
+    section[data-testid="stSidebar"] * {
+        color: #D5DFDA !important;
     }
 
+    /* トップヘッダーバナー */
     .modern-header {
-        background: linear-gradient(135deg, #141A17 0%, #1E2B24 100%);
-        padding: 2rem 2.5rem;
+        background: linear-gradient(135deg, #141E1A 0%, #1B2B24 100%);
+        padding: 1.9rem 2.4rem;
         border-radius: 16px;
         color: #F8F9FA;
         margin-bottom: 1.75rem;
         display: flex;
         justify-content: space-between;
         align-items: center;
-        box-shadow: 0 12px 30px rgba(20, 26, 23, 0.12);
-        border: 1px solid #2A3830;
+        box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+        border: 1px solid #2A3B33;
     }
     .header-badge {
         display: inline-flex;
         align-items: center;
         gap: 8px;
-        background: rgba(116, 198, 157, 0.12);
-        border: 1px solid rgba(116, 198, 157, 0.3);
-        color: #84D2A7;
+        background: rgba(82, 183, 136, 0.14);
+        border: 1px solid rgba(82, 183, 136, 0.35);
+        color: #74C69D;
         padding: 4px 12px;
         border-radius: 999px;
         font-size: 0.72rem;
@@ -143,6 +152,7 @@ st.markdown("""
         background-color: #52B788;
         border-radius: 50%;
         display: inline-block;
+        box-shadow: 0 0 8px #52B788;
     }
     .modern-title {
         font-size: 1.85rem;
@@ -153,35 +163,64 @@ st.markdown("""
     }
     .modern-sub {
         font-size: 0.92rem;
-        color: #A3B1AA;
+        color: #95A69E;
         margin-top: 0.45rem;
     }
 
+    /* カードコンテナ：ダークチャコールグリーン */
     div[data-testid="stVerticalBlockBorderWrapper"] {
-        background-color: #FFFFFF !important;
+        background-color: #151C19 !important;
         border-radius: 14px !important;
-        border: 1px solid #E2DFD7 !important;
-        box-shadow: 0 4px 16px rgba(20, 26, 23, 0.03) !important;
-        padding: 0.75rem !important;
+        border: 1px solid #24302B !important;
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.28) !important;
+        padding: 0.85rem !important;
     }
 
+    /* セクション見出し */
     .sec-title {
         display: flex;
         align-items: center;
         gap: 10px;
         font-size: 1.05rem;
         font-weight: 700;
-        color: #141A17;
-        margin-bottom: 0.75rem;
-        padding-bottom: 0.5rem;
-        border-bottom: 1px solid #F0EEE9;
+        color: #F0F5F2;
+        margin-bottom: 0.85rem;
+        padding-bottom: 0.55rem;
+        border-bottom: 1px solid #232F2A;
     }
 
+    /* ラジオボタン・タブ・入力欄のダーク調整 */
+    div[data-testid="stRadio"] label span,
+    div[data-testid="stFileUploader"] label,
+    div[data-testid="stTextInput"] label {
+        color: #DCE5E0 !important;
+    }
+    button[data-baseweb="tab"] {
+        color: #95A69E !important;
+    }
+    button[data-baseweb="tab"][aria-selected="true"] {
+        color: #74C69D !important;
+    }
+    section[data-testid="stFileUploaderDropzone"] {
+        background-color: #101614 !important;
+        border: 1px dashed #2E3D36 !important;
+        color: #B8C4BE !important;
+    }
+    div[data-baseweb="input"] > div {
+        background-color: #101614 !important;
+        border-color: #2A3832 !important;
+        color: #F0F5F2 !important;
+    }
+    input {
+        color: #F0F5F2 !important;
+    }
+
+    /* アクションボタン：フォレストグリーン発光アクセント */
     div.stButton > button {
-        background-color: #141A17;
-        color: #FFFFFF;
+        background: linear-gradient(135deg, #2D6A4F 0%, #1B4332 100%);
+        color: #FFFFFF !important;
         font-weight: 600;
-        border: 1px solid #141A17;
+        border: 1px solid #40916C;
         border-radius: 10px;
         padding: 0.75rem 1.5rem;
         font-size: 0.95rem;
@@ -190,13 +229,14 @@ st.markdown("""
         transition: all 0.2s ease;
     }
     div.stButton > button:hover {
-        background-color: #26362E;
-        border-color: #26362E;
+        background: linear-gradient(135deg, #40916C 0%, #2D6A4F 100%);
+        border-color: #74C69D;
         transform: translateY(-1px);
-        box-shadow: 0 6px 16px rgba(20, 26, 23, 0.16);
-        color: #FFFFFF;
+        box-shadow: 0 6px 20px rgba(82, 183, 136, 0.28);
+        color: #FFFFFF !important;
     }
 
+    /* カスタムKPIカード（ダーク仕様） */
     .kpi-grid {
         display: grid;
         grid-template-columns: repeat(3, 1fr);
@@ -204,31 +244,31 @@ st.markdown("""
         margin: 1rem 0;
     }
     .kpi-box {
-        background: #F9F8F6;
-        border: 1px solid #E6E3DC;
+        background: #101614;
+        border: 1px solid #24302B;
         border-radius: 10px;
         padding: 1rem 1.1rem;
     }
     .kpi-label {
         font-size: 0.78rem;
         font-weight: 600;
-        color: #646E68;
+        color: #8E9E96;
         margin-bottom: 0.3rem;
     }
     .kpi-val-safe {
         font-size: 1.65rem;
         font-weight: 700;
-        color: #1B6B46;
+        color: #52B788;
     }
     .kpi-val-danger {
         font-size: 1.65rem;
         font-weight: 700;
-        color: #C2410C;
+        color: #F97316;
     }
     .kpi-val-neutral {
         font-size: 1.65rem;
         font-weight: 700;
-        color: #2C3531;
+        color: #E2E8F0;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -262,17 +302,17 @@ def is_holding_tool_fast(kpts):
 with st.sidebar:
     st.markdown("""
     <div style="padding: 0.5rem 0 1rem 0;">
-        <div style="font-size: 0.72rem; font-weight: 700; letter-spacing: 0.12em; color: #52796F;">FIELD ANALYTICS</div>
-        <div style="font-size: 1.35rem; font-weight: 700; color: #141A17;">ForestSafe</div>
+        <div style="font-size: 0.72rem; font-weight: 700; letter-spacing: 0.12em; color: #74C69D;">FIELD ANALYTICS</div>
+        <div style="font-size: 1.35rem; font-weight: 700; color: #FFFFFF;">ForestSafe</div>
     </div>
     """, unsafe_allow_html=True)
     st.divider()
     st.markdown("**評価アルゴリズム基準**")
     st.markdown("""
-    <div style="font-size: 0.86rem; line-height: 1.65; color: #3A423E;">
-        <p><strong>01 / チェンソー作業</strong><br>機材保持中、手首座標が肩ラインより上方へ上がった場合に危険姿勢と判定します。</p>
-        <p><strong>02 / 刈払機作業</strong><br>機材保持中、右手首が腰ラインより大きく右側へ振り抜かれた場合に危険姿勢と判定します。</p>
-        <p><strong>03 / 稼働区間フィルタ</strong><br>両手首と体幹の距離から機材保持中のみを自動抽出し、移動・待機シーンを除外します。</p>
+    <div style="font-size: 0.86rem; line-height: 1.65; color: #A6B5AE;">
+        <p><strong style="color:#E6ECE9;">01 / チェンソー作業</strong><br>機材保持中、手首座標が肩ラインより上方へ上がった場合に危険姿勢と判定します。</p>
+        <p><strong style="color:#E6ECE9;">02 / 刈払機作業</strong><br>機材保持中、右手首が腰ラインより大きく右側へ振り抜かれた場合に危険姿勢と判定します。</p>
+        <p><strong style="color:#E6ECE9;">03 / 稼働区間フィルタ</strong><br>両手首と体幹の距離から機材保持中のみを自動抽出し、移動・待機シーンを除外します。</p>
     </div>
     """, unsafe_allow_html=True)
     st.divider()
@@ -292,8 +332,8 @@ st.markdown("""
         <div class="modern-title">農林作業 安全フォーム診断システム</div>
         <div class="modern-sub">骨格座標解析と稼働フィルタリングによる作業姿勢の定量評価</div>
     </div>
-    <div style="opacity: 0.85;">
-        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#84D2A7" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+    <div style="opacity: 0.9;">
+        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#74C69D" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
             <path d="M12 2L7 9h3l-4 6h4l-3 5h10l-3-5h4l-4-6h3L12 2z"/>
             <line x1="12" y1="20" x2="12" y2="23"/>
         </svg>
@@ -310,7 +350,7 @@ with col_left:
     with st.container(border=True):
         st.markdown("""
         <div class="sec-title">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#2D6A4F" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#74C69D" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
             </svg>
             <span>01. 対象機材の選択</span>
@@ -326,7 +366,7 @@ with col_left:
     with st.container(border=True):
         st.markdown("""
         <div class="sec-title">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#2D6A4F" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#74C69D" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/>
             </svg>
             <span>02. 映像データの入力</span>
@@ -372,7 +412,7 @@ with col_right:
     with st.container(border=True):
         st.markdown("""
         <div class="sec-title">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#2D6A4F" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#74C69D" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
             </svg>
             <span>03. 解析モニター・診断レポート</span>
@@ -533,11 +573,11 @@ with col_right:
                 st.success("評価所見: 全作業区間を通じて安全なフォームが維持されています。")
         else:
             st.markdown("""
-            <div style="text-align:center; padding: 5.5rem 1rem; color: #646E68; background-color: #FAF9F6; border-radius: 10px; border: 1px dashed #D5D1C8;">
-                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#8C9690" stroke-width="1.5" style="margin-bottom: 0.75rem;">
+            <div style="text-align:center; padding: 5.5rem 1rem; color: #8E9E96; background-color: #101614; border-radius: 10px; border: 1px dashed #283630;">
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#52796F" stroke-width="1.5" style="margin-bottom: 0.75rem;">
                     <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/>
                 </svg>
-                <div style="font-size: 0.98rem; font-weight: 600; color: #181C1A; margin-bottom: 0.35rem;">解析スタンバイ</div>
+                <div style="font-size: 0.98rem; font-weight: 600; color: #E6ECE9; margin-bottom: 0.35rem;">解析スタンバイ</div>
                 <div style="font-size: 0.85rem;">左側のパネルから対象機材と映像データを指定し、「解析を実行する」を選択してください。</div>
             </div>
             """, unsafe_allow_html=True)
@@ -547,7 +587,7 @@ if len(st.session_state.history) > 0:
     with st.container(border=True):
         st.markdown("""
         <div class="sec-title">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#2D6A4F" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#74C69D" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/>
             </svg>
             <span>診断履歴アーカイブ</span>
