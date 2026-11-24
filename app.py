@@ -89,7 +89,7 @@ if "analysis_result" not in st.session_state:
     st.session_state.analysis_result = None
 st.session_state.history = load_history()
 
-# 高コントラスト・ダークモードCSS（文字の視認性を徹底改善）
+# 視認性を徹底改善したダークモードCSS
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700&family=Noto+Sans+JP:wght@400;500;700&display=swap');
@@ -101,7 +101,7 @@ st.markdown("""
 
     /* 全体背景 */
     .stApp {
-        background-color: #111614;
+        background-color: #121816;
     }
 
     header[data-testid="stHeader"] {
@@ -110,8 +110,8 @@ st.markdown("""
 
     /* サイドバー */
     section[data-testid="stSidebar"] {
-        background-color: #161D1A !important;
-        border-right: 1px solid #283530;
+        background-color: #171F1C !important;
+        border-right: 1px solid #2C3B35;
     }
     section[data-testid="stSidebar"] p,
     section[data-testid="stSidebar"] span,
@@ -121,7 +121,7 @@ st.markdown("""
 
     /* トップヘッダーバナー */
     .modern-header {
-        background: linear-gradient(135deg, #18241F 0%, #21332B 100%);
+        background: linear-gradient(135deg, #1A2822 0%, #24382F 100%);
         padding: 1.8rem 2.2rem;
         border-radius: 14px;
         margin-bottom: 1.5rem;
@@ -129,15 +129,15 @@ st.markdown("""
         justify-content: space-between;
         align-items: center;
         box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
-        border: 1px solid #2F453B;
+        border: 1px solid #354D42;
     }
     .header-badge {
         display: inline-flex;
         align-items: center;
         gap: 8px;
-        background: rgba(82, 183, 136, 0.18);
-        border: 1px solid rgba(116, 198, 157, 0.4);
-        color: #8CE0B5 !important;
+        background: rgba(82, 183, 136, 0.2);
+        border: 1px solid rgba(116, 198, 157, 0.45);
+        color: #95E6BC !important;
         padding: 4px 12px;
         border-radius: 999px;
         font-size: 0.72rem;
@@ -161,17 +161,17 @@ st.markdown("""
     }
     .modern-sub {
         font-size: 0.92rem;
-        color: #C2D1CA !important;
+        color: #CBE0D6 !important;
         margin-top: 0.4rem;
     }
 
-    /* カードコンテナ：文字が浮き立つ明るいダークスレート */
+    /* カードコンテナ */
     div[data-testid="stVerticalBlockBorderWrapper"] {
-        background-color: #1A221F !important;
+        background-color: #1B2420 !important;
         border-radius: 14px !important;
-        border: 1px solid #2E3D37 !important;
+        border: 1px solid #32433C !important;
         box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25) !important;
-        padding: 0.85rem !important;
+        padding: 0.9rem !important;
     }
 
     /* セクション見出し */
@@ -184,70 +184,82 @@ st.markdown("""
         color: #FFFFFF !important;
         margin-bottom: 0.85rem;
         padding-bottom: 0.55rem;
-        border-bottom: 1px solid #2D3B35;
+        border-bottom: 1px solid #2F3F38;
     }
 
-    /* ラジオボタンの文字をクッキリ白に修正 */
+    /* ラジオボタンの文字 */
     div[data-testid="stRadio"] label,
     div[data-testid="stRadio"] label p,
     div[data-testid="stRadio"] label span {
-        color: #F3F6F4 !important;
+        color: #FFFFFF !important;
         font-weight: 600 !important;
         font-size: 0.98rem !important;
     }
 
-    /* タブの文字をクッキリ修正 */
-    button[data-baseweb="tab"] {
-        color: #B4C4BC !important;
+    /* タブ（「動画ファイル」「YouTube URL」）の文字を確実に明るく表示 */
+    button[data-baseweb="tab"],
+    button[data-baseweb="tab"] p,
+    button[data-baseweb="tab"] span,
+    button[data-baseweb="tab"] div {
+        color: #D5E3DC !important;
         font-weight: 600 !important;
+        font-size: 0.95rem !important;
     }
-    button[data-baseweb="tab"][aria-selected="true"] {
-        color: #74C69D !important;
+    button[data-baseweb="tab"][aria-selected="true"],
+    button[data-baseweb="tab"][aria-selected="true"] p,
+    button[data-baseweb="tab"][aria-selected="true"] span {
+        color: #7CE0AE !important;
+    }
+    div[data-baseweb="tab-highlight"] {
+        background-color: #52B788 !important;
     }
 
-    /* キャプション・ラベル類の視認性アップ */
+    /* キャプション・ラベル類 */
     div[data-testid="stCaptionContainer"] p,
     label[data-testid="stWidgetLabel"] p {
-        color: #D0DDD7 !important;
+        color: #DCE8E2 !important;
+        font-size: 0.9rem !important;
     }
 
-    /* ファイルアップロード枠のダーク化（白浮き防止） */
+    /* ファイルアップロード枠 */
     section[data-testid="stFileUploaderDropzone"] {
-        background-color: #131917 !important;
-        border: 1px dashed #3B4F47 !important;
+        background-color: #141B18 !important;
+        border: 1.5px dashed #435A50 !important;
         border-radius: 10px !important;
     }
     section[data-testid="stFileUploaderDropzone"] span,
     section[data-testid="stFileUploaderDropzone"] small,
     section[data-testid="stFileUploaderDropzone"] div {
-        color: #D5E0DB !important;
+        color: #E2ECE7 !important;
     }
     section[data-testid="stFileUploaderDropzone"] button {
-        background-color: #26352F !important;
+        background-color: #293B33 !important;
         color: #FFFFFF !important;
-        border: 1px solid #40594F !important;
+        border: 1px solid #4A695B !important;
     }
 
-    /* テキスト入力欄のダーク化（白浮き防止） */
-    div[data-baseweb="input"] > div,
-    div[data-baseweb="base-input"] {
-        background-color: #131917 !important;
-        border: 1px solid #384A42 !important;
-        border-radius: 8px !important;
-    }
-    input {
+    /* テキスト入力欄：白い箱を完全に消してダーク統一＋文字クッキリ */
+    div[data-testid="stTextInput"] div[data-baseweb="input"],
+    div[data-testid="stTextInput"] div[data-baseweb="base-input"],
+    div[data-testid="stTextInput"] input {
+        background-color: #141B18 !important;
         color: #FFFFFF !important;
         -webkit-text-fill-color: #FFFFFF !important;
     }
-    input::placeholder {
-        color: #7F9188 !important;
-        -webkit-text-fill-color: #7F9188 !important;
+    div[data-testid="stTextInput"] div[data-baseweb="input"] {
+        border: 1px solid #435A50 !important;
+        border-radius: 8px !important;
+    }
+    div[data-testid="stTextInput"] input::placeholder {
+        color: #96ABA1 !important;
+        -webkit-text-fill-color: #96ABA1 !important;
+        opacity: 1 !important;
     }
 
-    /* アラート・エラーボックスのダーク馴染み */
+    /* アラート・エラーボックス */
     div[data-testid="stAlert"] {
-        background-color: #1E2422 !important;
-        border: 1px solid #3A4742 !important;
+        background-color: #222926 !important;
+        border: 1px solid #43524C !important;
         color: #F3F6F4 !important;
     }
     div[data-testid="stAlert"] p {
@@ -283,21 +295,21 @@ st.markdown("""
         margin: 1rem 0;
     }
     .kpi-box {
-        background: #131917;
-        border: 1px solid #2D3B35;
+        background: #141B18;
+        border: 1px solid #32433C;
         border-radius: 10px;
         padding: 1rem 1.1rem;
     }
     .kpi-label {
-        font-size: 0.8rem;
+        font-size: 0.82rem;
         font-weight: 600;
-        color: #B4C4BC !important;
+        color: #C4D4CC !important;
         margin-bottom: 0.3rem;
     }
     .kpi-val-safe {
         font-size: 1.65rem;
         font-weight: 700;
-        color: #52B788 !important;
+        color: #5CE09E !important;
     }
     .kpi-val-danger {
         font-size: 1.65rem;
@@ -307,7 +319,7 @@ st.markdown("""
     .kpi-val-neutral {
         font-size: 1.65rem;
         font-weight: 700;
-        color: #F3F6F4 !important;
+        color: #FFFFFF !important;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -341,14 +353,14 @@ def is_holding_tool_fast(kpts):
 with st.sidebar:
     st.markdown("""
     <div style="padding: 0.5rem 0 1rem 0;">
-        <div style="font-size: 0.72rem; font-weight: 700; letter-spacing: 0.12em; color: #74C69D;">FIELD ANALYTICS</div>
+        <div style="font-size: 0.72rem; font-weight: 700; letter-spacing: 0.12em; color: #7CE0AE;">FIELD ANALYTICS</div>
         <div style="font-size: 1.35rem; font-weight: 700; color: #FFFFFF;">ForestSafe</div>
     </div>
     """, unsafe_allow_html=True)
     st.divider()
     st.markdown("**評価アルゴリズム基準**")
     st.markdown("""
-    <div style="font-size: 0.86rem; line-height: 1.65; color: #D0DDD7;">
+    <div style="font-size: 0.86rem; line-height: 1.65; color: #DCE8E2;">
         <p><strong style="color:#FFFFFF;">01 / チェンソー作業</strong><br>機材保持中、手首座標が肩ラインより上方へ上がった場合に危険姿勢と判定します。</p>
         <p><strong style="color:#FFFFFF;">02 / 刈払機作業</strong><br>機材保持中、右手首が腰ラインより大きく右側へ振り抜かれた場合に危険姿勢と判定します。</p>
         <p><strong style="color:#FFFFFF;">03 / 稼働区間フィルタ</strong><br>両手首と体幹の距離から機材保持中のみを自動抽出し、移動・待機シーンを除外します。</p>
@@ -372,7 +384,7 @@ st.markdown("""
         <div class="modern-sub">骨格座標解析と稼働フィルタリングによる作業姿勢の定量評価</div>
     </div>
     <div style="opacity: 0.9;">
-        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#74C69D" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#7CE0AE" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
             <path d="M12 2L7 9h3l-4 6h4l-3 5h10l-3-5h4l-4-6h3L12 2z"/>
             <line x1="12" y1="20" x2="12" y2="23"/>
         </svg>
@@ -389,7 +401,7 @@ with col_left:
     with st.container(border=True):
         st.markdown("""
         <div class="sec-title">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#74C69D" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#7CE0AE" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
             </svg>
             <span>01. 対象機材の選択</span>
@@ -405,7 +417,7 @@ with col_left:
     with st.container(border=True):
         st.markdown("""
         <div class="sec-title">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#74C69D" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#7CE0AE" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/>
             </svg>
             <span>02. 映像データの入力</span>
@@ -451,7 +463,7 @@ with col_right:
     with st.container(border=True):
         st.markdown("""
         <div class="sec-title">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#74C69D" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#7CE0AE" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
             </svg>
             <span>03. 解析モニター・診断レポート</span>
@@ -612,12 +624,12 @@ with col_right:
                 st.success("評価所見: 全作業区間を通じて安全なフォームが維持されています。")
         else:
             st.markdown("""
-            <div style="text-align:center; padding: 5.5rem 1rem; color: #C2D1CA; background-color: #131917; border-radius: 10px; border: 1px dashed #34463F;">
-                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#74C69D" stroke-width="1.5" style="margin-bottom: 0.75rem;">
+            <div style="text-align:center; padding: 5.5rem 1rem; color: #DCE8E2; background-color: #141B18; border-radius: 10px; border: 1px dashed #3D5249;">
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#7CE0AE" stroke-width="1.5" style="margin-bottom: 0.75rem;">
                     <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/>
                 </svg>
                 <div style="font-size: 1rem; font-weight: 700; color: #FFFFFF; margin-bottom: 0.35rem;">解析スタンバイ</div>
-                <div style="font-size: 0.88rem; color: #B4C4BC;">左側のパネルから対象機材と映像データを指定し、「解析を実行する」を選択してください。</div>
+                <div style="font-size: 0.88rem; color: #C4D4CC;">左側のパネルから対象機材と映像データを指定し、「解析を実行する」を選択してください。</div>
             </div>
             """, unsafe_allow_html=True)
 
@@ -626,7 +638,7 @@ if len(st.session_state.history) > 0:
     with st.container(border=True):
         st.markdown("""
         <div class="sec-title">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#74C69D" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#7CE0AE" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/>
             </svg>
             <span>診断履歴アーカイブ</span>
