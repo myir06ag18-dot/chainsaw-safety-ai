@@ -1,5 +1,5 @@
+streamlit
 ultralytics
 opencv-python-headless
-numpy
-streamlit
-yt-dlp
+pandas
+yt-dlp>=2026.1.1
