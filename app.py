@@ -5,6 +5,7 @@ import pandas as pd
 from datetime import datetime, timezone, timedelta
 import tempfile
 import os
+import re
 import yt_dlp
 from ultralytics import YOLO
 
@@ -27,6 +28,66 @@ def save_history(history_list):
     df = pd.DataFrame(history_list)
     df.to_csv(HISTORY_FILE, index=False, encoding="utf-8-sig")
 
+# YouTubeのあらゆるURL形式（通常・短縮・Shorts・余分なパラメータ付き）を正規化する関数
+def normalize_youtube_url(raw_url: str) -> str:
+    url = raw_url.strip()
+    # 動画ID（11文字）を抽出して標準URLに統一
+    patterns = [
+        r"(?:v=|\/v\/|embed\/|youtu\.be\/|\/shorts\/)([a-zA-Z0-9_-]{11})"
+    ]
+    for pattern in patterns:
+        match = re.search(pattern, url)
+        if match:
+            return f"https://www.youtube.com/watch?v={match.group(1)}"
+    return url
+
+# YouTube動画を1回だけ取得してキャッシュする関数（解析ボタン押下時の再取得エラーを防止）
+def fetch_youtube_video(url: str):
+    clean_url = normalize_youtube_url(url)
+    if st.session_state.get("yt_cached_url") == clean_url and st.session_state.get("yt_cached_path"):
+        if os.path.exists(st.session_state["yt_cached_path"]):
+            return st.session_state["yt_cached_path"], clean_url, None
+
+    temp_dir = tempfile.mkdtemp()
+    output_path = os.path.join(temp_dir, "youtube_video.mp4")
+
+    # 複数のクライアント設定を順番に試してブロックを回避（720p以下の軽量MP4を優先）
+    client_profiles = [
+        ['android_vr', 'tv_embedded'],
+        ['ios', 'mweb'],
+        ['web']
+    ]
+
+    last_error = ""
+    for clients in client_profiles:
+        ydl_opts = {
+            'format': 'best[ext=mp4][height<=720]/best[ext=mp4]/best',
+            'outtmpl': output_path,
+            'quiet': True,
+            'no_warnings': True,
+            'noplaylist': True,
+            'geo_bypass': True,
+            'nocheckcertificate': True,
+            'socket_timeout': 20,
+            'extractor_args': {
+                'youtube': {
+                    'player_client': clients
+                }
+            }
+        }
+        try:
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                ydl.download([clean_url])
+            if os.path.exists(output_path) and os.path.getsize(output_path) > 0:
+                st.session_state["yt_cached_url"] = clean_url
+                st.session_state["yt_cached_path"] = output_path
+                return output_path, clean_url, None
+        except Exception as e:
+            last_error = str(e)
+            continue
+
+    return None, clean_url, last_error
+
 if "analysis_result" not in st.session_state:
     st.session_state.analysis_result = None
 st.session_state.history = load_history()
@@ -41,7 +102,6 @@ st.markdown("""
         color: #181C1A;
     }
 
-    /* 背景：上品なウォームストーン（#F5F4F0） */
     .stApp {
         background-color: #F5F4F0;
     }
@@ -50,13 +110,11 @@ st.markdown("""
         background: transparent !important;
     }
 
-    /* サイドバー */
     section[data-testid="stSidebar"] {
         background-color: #ECEAE4 !important;
         border-right: 1px solid #DCD9D0;
     }
 
-    /* トップヘッダー：漆黒×ディープパインのモダンなバナー */
     .modern-header {
         background: linear-gradient(135deg, #141A17 0%, #1E2B24 100%);
         padding: 2rem 2.5rem;
@@ -103,7 +161,6 @@ st.markdown("""
         margin-top: 0.45rem;
     }
 
-    /* カードコンテナ：クリーンな白＋繊細な1pxボーダー */
     div[data-testid="stVerticalBlockBorderWrapper"] {
         background-color: #FFFFFF !important;
         border-radius: 14px !important;
@@ -112,7 +169,6 @@ st.markdown("""
         padding: 0.75rem !important;
     }
 
-    /* セクション見出し（SVGアイコン付き） */
     .sec-title {
         display: flex;
         align-items: center;
@@ -125,7 +181,6 @@ st.markdown("""
         border-bottom: 1px solid #F0EEE9;
     }
 
-    /* アクションボタン：モダンなダークチャコール */
     div.stButton > button {
         background-color: #141A17;
         color: #FFFFFF;
@@ -146,7 +201,6 @@ st.markdown("""
         color: #FFFFFF;
     }
 
-    /* カスタムKPIカード */
     .kpi-grid {
         display: grid;
         grid-template-columns: repeat(3, 1fr);
@@ -296,33 +350,23 @@ with col_left:
                 st.caption(f"セット完了: {uploaded_file.name}")
 
         with tab2:
-            youtube_url = st.text_input("動画URLを入力", placeholder="https://www.youtube.com/watch?v=...")
-            if youtube_url:
-                clean_url = youtube_url.split("?si=")[0]
-                with st.spinner("映像データを取得しています..."):
-                    try:
-                        temp_dir = tempfile.mkdtemp()
-                        output_path = os.path.join(temp_dir, "youtube_video.mp4")
-                        ydl_opts = {
-                            'format': 'best[ext=mp4]/best',
-                            'outtmpl': output_path,
-                            'quiet': True,
-                            'noplaylist': True,
-                            'geo_bypass': True,
-                            'nocheckcertificate': True,
-                            'extractor_args': {
-                                'youtube': {
-                                    'player_client': ['tv', 'ios', 'mweb']
-                                }
-                            }
-                        }
-                        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                            ydl.download([clean_url])
-                        video_path = output_path
-                        video_name = clean_url
-                        st.caption("映像データの取得が完了しました。")
-                    except Exception as e:
-                        st.error("URLからの直接取得に失敗しました。動画ファイルタブをご利用ください。")
+            youtube_url = st.text_input(
+                "YouTubeのURLを貼り付けてEnterを押してください",
+                placeholder="https://www.youtube.com/watch?v=... または https://youtu.be/...",
+                key="yt_url_input"
+            )
+            if youtube_url and youtube_url.strip():
+                with st.spinner("YouTubeから映像データを取得しています..."):
+                    fetched_path, normalized_url, err_msg = fetch_youtube_video(youtube_url)
+                if fetched_path:
+                    video_path = fetched_path
+                    video_name = normalized_url
+                    st.success(f"映像データの準備が完了しました（{normalized_url}）")
+                else:
+                    st.error("YouTube側の制限により自動取得できませんでした。お手数ですが動画をMP4として保存し、「動画ファイル」タブからアップロードしてください。")
+                    if err_msg:
+                        with st.expander("エラー詳細"):
+                            st.code(err_msg)
 
     if video_path is not None:
         start_btn = st.button("解析を実行する")
