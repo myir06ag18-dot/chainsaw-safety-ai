@@ -89,62 +89,61 @@ if "analysis_result" not in st.session_state:
     st.session_state.analysis_result = None
 st.session_state.history = load_history()
 
-# フルダークモード・フィールドテックCSS（白さを完全に排除）
+# 高コントラスト・ダークモードCSS（文字の視認性を徹底改善）
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700&family=Noto+Sans+JP:wght@400;500;700&display=swap');
 
     html, body, [class*="css"] {
         font-family: 'Plus Jakarta Sans', 'Noto Sans JP', sans-serif;
-        color: #E6ECE9;
+        color: #F3F6F4 !important;
     }
 
-    /* 全体背景：マットな漆黒×ディープフォレスト */
+    /* 全体背景 */
     .stApp {
-        background-color: #0D1210;
-        background-image: radial-gradient(circle at 18% 12%, rgba(45, 106, 79, 0.16) 0%, transparent 45%),
-                          radial-gradient(circle at 85% 88%, rgba(27, 67, 50, 0.18) 0%, transparent 50%);
+        background-color: #111614;
     }
 
     header[data-testid="stHeader"] {
         background: transparent !important;
     }
 
-    /* サイドバー：ダークスレート */
+    /* サイドバー */
     section[data-testid="stSidebar"] {
-        background-color: #111715 !important;
-        border-right: 1px solid #222D28;
+        background-color: #161D1A !important;
+        border-right: 1px solid #283530;
     }
-    section[data-testid="stSidebar"] * {
-        color: #D5DFDA !important;
+    section[data-testid="stSidebar"] p,
+    section[data-testid="stSidebar"] span,
+    section[data-testid="stSidebar"] div {
+        color: #E2EAE6 !important;
     }
 
     /* トップヘッダーバナー */
     .modern-header {
-        background: linear-gradient(135deg, #141E1A 0%, #1B2B24 100%);
-        padding: 1.9rem 2.4rem;
-        border-radius: 16px;
-        color: #F8F9FA;
-        margin-bottom: 1.75rem;
+        background: linear-gradient(135deg, #18241F 0%, #21332B 100%);
+        padding: 1.8rem 2.2rem;
+        border-radius: 14px;
+        margin-bottom: 1.5rem;
         display: flex;
         justify-content: space-between;
         align-items: center;
-        box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
-        border: 1px solid #2A3B33;
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+        border: 1px solid #2F453B;
     }
     .header-badge {
         display: inline-flex;
         align-items: center;
         gap: 8px;
-        background: rgba(82, 183, 136, 0.14);
-        border: 1px solid rgba(82, 183, 136, 0.35);
-        color: #74C69D;
+        background: rgba(82, 183, 136, 0.18);
+        border: 1px solid rgba(116, 198, 157, 0.4);
+        color: #8CE0B5 !important;
         padding: 4px 12px;
         border-radius: 999px;
         font-size: 0.72rem;
         font-weight: 600;
         letter-spacing: 0.1em;
-        margin-bottom: 0.75rem;
+        margin-bottom: 0.65rem;
     }
     .status-dot {
         width: 7px;
@@ -152,27 +151,26 @@ st.markdown("""
         background-color: #52B788;
         border-radius: 50%;
         display: inline-block;
-        box-shadow: 0 0 8px #52B788;
     }
     .modern-title {
-        font-size: 1.85rem;
+        font-size: 1.8rem;
         font-weight: 700;
         letter-spacing: 0.02em;
         margin: 0;
-        color: #FFFFFF;
+        color: #FFFFFF !important;
     }
     .modern-sub {
         font-size: 0.92rem;
-        color: #95A69E;
-        margin-top: 0.45rem;
+        color: #C2D1CA !important;
+        margin-top: 0.4rem;
     }
 
-    /* カードコンテナ：ダークチャコールグリーン */
+    /* カードコンテナ：文字が浮き立つ明るいダークスレート */
     div[data-testid="stVerticalBlockBorderWrapper"] {
-        background-color: #151C19 !important;
+        background-color: #1A221F !important;
         border-radius: 14px !important;
-        border: 1px solid #24302B !important;
-        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.28) !important;
+        border: 1px solid #2E3D37 !important;
+        box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25) !important;
         padding: 0.85rem !important;
     }
 
@@ -183,60 +181,101 @@ st.markdown("""
         gap: 10px;
         font-size: 1.05rem;
         font-weight: 700;
-        color: #F0F5F2;
+        color: #FFFFFF !important;
         margin-bottom: 0.85rem;
         padding-bottom: 0.55rem;
-        border-bottom: 1px solid #232F2A;
+        border-bottom: 1px solid #2D3B35;
     }
 
-    /* ラジオボタン・タブ・入力欄のダーク調整 */
-    div[data-testid="stRadio"] label span,
-    div[data-testid="stFileUploader"] label,
-    div[data-testid="stTextInput"] label {
-        color: #DCE5E0 !important;
+    /* ラジオボタンの文字をクッキリ白に修正 */
+    div[data-testid="stRadio"] label,
+    div[data-testid="stRadio"] label p,
+    div[data-testid="stRadio"] label span {
+        color: #F3F6F4 !important;
+        font-weight: 600 !important;
+        font-size: 0.98rem !important;
     }
+
+    /* タブの文字をクッキリ修正 */
     button[data-baseweb="tab"] {
-        color: #95A69E !important;
+        color: #B4C4BC !important;
+        font-weight: 600 !important;
     }
     button[data-baseweb="tab"][aria-selected="true"] {
         color: #74C69D !important;
     }
-    section[data-testid="stFileUploaderDropzone"] {
-        background-color: #101614 !important;
-        border: 1px dashed #2E3D36 !important;
-        color: #B8C4BE !important;
-    }
-    div[data-baseweb="input"] > div {
-        background-color: #101614 !important;
-        border-color: #2A3832 !important;
-        color: #F0F5F2 !important;
-    }
-    input {
-        color: #F0F5F2 !important;
+
+    /* キャプション・ラベル類の視認性アップ */
+    div[data-testid="stCaptionContainer"] p,
+    label[data-testid="stWidgetLabel"] p {
+        color: #D0DDD7 !important;
     }
 
-    /* アクションボタン：フォレストグリーン発光アクセント */
+    /* ファイルアップロード枠のダーク化（白浮き防止） */
+    section[data-testid="stFileUploaderDropzone"] {
+        background-color: #131917 !important;
+        border: 1px dashed #3B4F47 !important;
+        border-radius: 10px !important;
+    }
+    section[data-testid="stFileUploaderDropzone"] span,
+    section[data-testid="stFileUploaderDropzone"] small,
+    section[data-testid="stFileUploaderDropzone"] div {
+        color: #D5E0DB !important;
+    }
+    section[data-testid="stFileUploaderDropzone"] button {
+        background-color: #26352F !important;
+        color: #FFFFFF !important;
+        border: 1px solid #40594F !important;
+    }
+
+    /* テキスト入力欄のダーク化（白浮き防止） */
+    div[data-baseweb="input"] > div,
+    div[data-baseweb="base-input"] {
+        background-color: #131917 !important;
+        border: 1px solid #384A42 !important;
+        border-radius: 8px !important;
+    }
+    input {
+        color: #FFFFFF !important;
+        -webkit-text-fill-color: #FFFFFF !important;
+    }
+    input::placeholder {
+        color: #7F9188 !important;
+        -webkit-text-fill-color: #7F9188 !important;
+    }
+
+    /* アラート・エラーボックスのダーク馴染み */
+    div[data-testid="stAlert"] {
+        background-color: #1E2422 !important;
+        border: 1px solid #3A4742 !important;
+        color: #F3F6F4 !important;
+    }
+    div[data-testid="stAlert"] p {
+        color: #F3F6F4 !important;
+    }
+
+    /* アクションボタン */
     div.stButton > button {
         background: linear-gradient(135deg, #2D6A4F 0%, #1B4332 100%);
         color: #FFFFFF !important;
-        font-weight: 600;
-        border: 1px solid #40916C;
+        font-weight: 700;
+        border: 1px solid #52B788;
         border-radius: 10px;
         padding: 0.75rem 1.5rem;
-        font-size: 0.95rem;
+        font-size: 0.98rem;
         letter-spacing: 0.04em;
         width: 100%;
         transition: all 0.2s ease;
     }
     div.stButton > button:hover {
         background: linear-gradient(135deg, #40916C 0%, #2D6A4F 100%);
-        border-color: #74C69D;
+        border-color: #95D5B2;
         transform: translateY(-1px);
-        box-shadow: 0 6px 20px rgba(82, 183, 136, 0.28);
+        box-shadow: 0 6px 20px rgba(82, 183, 136, 0.3);
         color: #FFFFFF !important;
     }
 
-    /* カスタムKPIカード（ダーク仕様） */
+    /* カスタムKPIカード */
     .kpi-grid {
         display: grid;
         grid-template-columns: repeat(3, 1fr);
@@ -244,31 +283,31 @@ st.markdown("""
         margin: 1rem 0;
     }
     .kpi-box {
-        background: #101614;
-        border: 1px solid #24302B;
+        background: #131917;
+        border: 1px solid #2D3B35;
         border-radius: 10px;
         padding: 1rem 1.1rem;
     }
     .kpi-label {
-        font-size: 0.78rem;
+        font-size: 0.8rem;
         font-weight: 600;
-        color: #8E9E96;
+        color: #B4C4BC !important;
         margin-bottom: 0.3rem;
     }
     .kpi-val-safe {
         font-size: 1.65rem;
         font-weight: 700;
-        color: #52B788;
+        color: #52B788 !important;
     }
     .kpi-val-danger {
         font-size: 1.65rem;
         font-weight: 700;
-        color: #F97316;
+        color: #FB923C !important;
     }
     .kpi-val-neutral {
         font-size: 1.65rem;
         font-weight: 700;
-        color: #E2E8F0;
+        color: #F3F6F4 !important;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -309,10 +348,10 @@ with st.sidebar:
     st.divider()
     st.markdown("**評価アルゴリズム基準**")
     st.markdown("""
-    <div style="font-size: 0.86rem; line-height: 1.65; color: #A6B5AE;">
-        <p><strong style="color:#E6ECE9;">01 / チェンソー作業</strong><br>機材保持中、手首座標が肩ラインより上方へ上がった場合に危険姿勢と判定します。</p>
-        <p><strong style="color:#E6ECE9;">02 / 刈払機作業</strong><br>機材保持中、右手首が腰ラインより大きく右側へ振り抜かれた場合に危険姿勢と判定します。</p>
-        <p><strong style="color:#E6ECE9;">03 / 稼働区間フィルタ</strong><br>両手首と体幹の距離から機材保持中のみを自動抽出し、移動・待機シーンを除外します。</p>
+    <div style="font-size: 0.86rem; line-height: 1.65; color: #D0DDD7;">
+        <p><strong style="color:#FFFFFF;">01 / チェンソー作業</strong><br>機材保持中、手首座標が肩ラインより上方へ上がった場合に危険姿勢と判定します。</p>
+        <p><strong style="color:#FFFFFF;">02 / 刈払機作業</strong><br>機材保持中、右手首が腰ラインより大きく右側へ振り抜かれた場合に危険姿勢と判定します。</p>
+        <p><strong style="color:#FFFFFF;">03 / 稼働区間フィルタ</strong><br>両手首と体幹の距離から機材保持中のみを自動抽出し、移動・待機シーンを除外します。</p>
     </div>
     """, unsafe_allow_html=True)
     st.divider()
@@ -386,7 +425,7 @@ with col_left:
         with tab2:
             youtube_url = st.text_input(
                 "YouTubeのURLを貼り付けてEnterを押してください",
-                placeholder="https://www.youtube.com/watch?v=... または https://youtu.be/...",
+                placeholder="https://www.youtube.com/watch?v=...",
                 key="yt_url_input"
             )
             if youtube_url and youtube_url.strip():
@@ -573,12 +612,12 @@ with col_right:
                 st.success("評価所見: 全作業区間を通じて安全なフォームが維持されています。")
         else:
             st.markdown("""
-            <div style="text-align:center; padding: 5.5rem 1rem; color: #8E9E96; background-color: #101614; border-radius: 10px; border: 1px dashed #283630;">
-                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#52796F" stroke-width="1.5" style="margin-bottom: 0.75rem;">
+            <div style="text-align:center; padding: 5.5rem 1rem; color: #C2D1CA; background-color: #131917; border-radius: 10px; border: 1px dashed #34463F;">
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#74C69D" stroke-width="1.5" style="margin-bottom: 0.75rem;">
                     <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/>
                 </svg>
-                <div style="font-size: 0.98rem; font-weight: 600; color: #E6ECE9; margin-bottom: 0.35rem;">解析スタンバイ</div>
-                <div style="font-size: 0.85rem;">左側のパネルから対象機材と映像データを指定し、「解析を実行する」を選択してください。</div>
+                <div style="font-size: 1rem; font-weight: 700; color: #FFFFFF; margin-bottom: 0.35rem;">解析スタンバイ</div>
+                <div style="font-size: 0.88rem; color: #B4C4BC;">左側のパネルから対象機材と映像データを指定し、「解析を実行する」を選択してください。</div>
             </div>
             """, unsafe_allow_html=True)
 
