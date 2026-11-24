@@ -6,7 +6,7 @@ from datetime import datetime, timezone, timedelta
 import tempfile
 import os
 import re
-import yt-dlp>=2026.1.1
+import yt_dlp
 from ultralytics import YOLO
 
 st.set_page_config(
@@ -39,7 +39,6 @@ def normalize_youtube_url(raw_url: str) -> str:
             return f"https://www.youtube.com/watch?v={match.group(1)}"
     return url
 
-# 音声不要の映像ストリーム(bestvideo)を優先して「Requested format is not available」を回避
 def fetch_youtube_video(url: str):
     clean_url = normalize_youtube_url(url)
     if st.session_state.get("yt_cached_url") == clean_url and st.session_state.get("yt_cached_path"):
@@ -49,15 +48,16 @@ def fetch_youtube_video(url: str):
     temp_dir = tempfile.mkdtemp()
     output_template = os.path.join(temp_dir, "youtube_video.%(ext)s")
 
-    format_candidates = [
-        "bestvideo[height<=720][ext=mp4]/bestvideo[height<=720]/best[height<=720]/best",
-        "bestvideo/best"
+    configs = [
+        {"client": ["tv"], "fmt": "best[height<=720]/best"},
+        {"client": ["ios"], "fmt": "bestvideo[height<=720]/best[height<=720]/best"},
+        {"client": ["android_vr"], "fmt": "bestvideo[height<=720]/best"},
     ]
 
     last_error = ""
-    for fmt in format_candidates:
+    for cfg in configs:
         ydl_opts = {
-            "format": fmt,
+            "format": cfg["fmt"],
             "outtmpl": output_template,
             "quiet": True,
             "no_warnings": True,
@@ -65,6 +65,11 @@ def fetch_youtube_video(url: str):
             "geo_bypass": True,
             "nocheckcertificate": True,
             "socket_timeout": 20,
+            "extractor_args": {
+                "youtube": {
+                    "player_client": cfg["client"]
+                }
+            }
         }
         try:
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
